@@ -10,9 +10,9 @@ import { WallpaperSection } from "sections/wallpaper.slint";
 
 import {
   TabletSection,
-  AppSelectionModal
+  AppSelectionModal,
+  TabletUIState
 } from "sections/tablet.slint";
-
 
 component SettingsView inherits Rectangle {
   private property <string> activeView;
@@ -27,12 +27,13 @@ component SettingsView inherits Rectangle {
 }
 
 component ModalsView inherits Rectangle {
-
-  if UIState.show-app-selection-modal: AppSelectionModal {}
+  if TabletUIState.show-app-selection-modal:
+    AppSelectionModal {}
 }
 
 export component MainWindow inherits Window {
   default-font-family: "Ubuntu";
+  callback populate;
 
   no-frame: true;
   min-width: 535px;
@@ -50,4 +51,4 @@ export component MainWindow inherits Window {
   ModalsView {}
 }
 
-export { UIState }
+export { UIState, TabletUIState }

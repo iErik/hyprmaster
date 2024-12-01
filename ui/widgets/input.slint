@@ -1,31 +1,3 @@
-//import { LineEdit } from "std-widgets.slint";
-
-export component TextIn inherits Rectangle {
-  background: rgba(46, 49, 50, 0.4);
-  height: 45px;
-  preferred-height: 45px;
-  border-radius: 8px;
-  //clip: true;
-
-  HorizontalLayout {
-    padding-right: 10px;
-    padding-left: 10px;
-
-    Rectangle {
-      background: red;
-      max-width: root.width;
-
-      TextInput {
-        height: root.height;
-        max-width: root.width;
-        vertical-alignment: TextVerticalAlignment.center;
-        //color: rgba(163, 171, 182, 0.9);
-        color: green;
-      }
-     }
-  }
-}
-
 export component LineEditBase inherits Rectangle {
   clip: true;
 
@@ -53,6 +25,7 @@ export component LineEditBase inherits Rectangle {
   in property <color> selection-foreground-color
     <=> text-input.selection-foreground-color;
 
+  callback changed <=> text-input.edited;
 
   placeholder := Text {
     width: 100%;
@@ -143,6 +116,8 @@ export component LineEdit inherits Rectangle {
     <=> input.selection-background-color;
   in property <color> selection-foreground-color
     <=> input.selection-foreground-color;
+
+  callback changed <=> input.changed;
 
   HorizontalLayout {
     padding-right: 12px;

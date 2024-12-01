@@ -1,48 +1,51 @@
 import {
+  Section,
   SectionBox,
   SectionTitle
 } from "../widgets/boxes.slint";
 
 import { ActionBtn } from "../widgets/buttons.slint";
 import { FadeModal } from "../widgets/modal.slint";
-import { TextIn, LineEdit } from "../widgets/input.slint";
+import { LineEdit } from "../widgets/input.slint";
 
-import { UIState } from "../globals.slint";
+import { UIState, AppEntry } from "../globals.slint";
 
-export component TabletSection inherits Rectangle {
+export global TabletUIState {
+  in-out property <[AppEntry]> app-entries;
+  in-out property <bool> show-app-selection-modal: false;
 
-  VerticalLayout {
-    alignment: start;
-    padding-left: 15px;
-    padding-right: 15px;
+  in-out property <string> search-query;
+  callback fetch-app-entries;
+  callback filter-app-entries(string);
+}
 
-    private property <bool> show-app-modal: false;
+export component TabletSection inherits Section {
+  title: "Drawing Tablet";
 
-    SectionTitle { text: "Drawing Tablet"; }
+  init => { TabletUIState.fetch-app-entries(); }
 
-    SectionBox {
-      icon: @image-url("../icons/link.svg");
-      title: "Application-specific presets";
+  SectionBox {
+    icon: @image-url("../icons/link.svg");
+    title: "Application-specific presets";
 
-      VerticalLayout {
-        padding-top: 15px;
-        padding-bottom: 15px;
+    VerticalLayout {
+      padding-top: 15px;
+      padding-bottom: 15px;
 
-        padding-left: 10px;
-        padding-right: 10px;
+      padding-left: 10px;
+      padding-right: 10px;
 
+      alignment: center;
+
+      HorizontalLayout {
         alignment: center;
 
-        HorizontalLayout {
-          alignment: center;
-
-          ActionBtn {
-            icon-left: @image-url("../icons/box.svg");
-            text: "Add application";
-            icon-right: @image-url("../icons/arrow-down.svg");
-            clicked => {
-              UIState.show-app-selection-modal = true;
-            }
+        ActionBtn {
+          icon-left: @image-url("../icons/box.svg");
+          text: "Add application";
+          icon-right: @image-url("../icons/arrow-down.svg");
+          clicked => {
+            TabletUIState.show-app-selection-modal = true;
           }
         }
       }
@@ -95,6 +98,7 @@ export component ListItem inherits Rectangle {
 export component AppSelectionModal inherits FadeModal {
   private property <string> search-query;
 
+
   VerticalLayout {
     alignment: stretch;
     height: 100%;
@@ -104,7 +108,7 @@ export component AppSelectionModal inherits FadeModal {
       padding-top: 10px;
       height: 60px;
 
-      LineEdit {
+      search-field := LineEdit {
         placeholder-text: "Search applications...";
         placeholder-color: rgba(163, 171, 182, 0.5);
         text-color: rgba(163, 171, 182, 0.9);
@@ -113,15 +117,19 @@ export component AppSelectionModal inherits FadeModal {
         width: 250px;
         margin: 10px;
         horizontal-alignment: TextHorizontalAlignment.center;
+
+        changed => {
+          TabletUIState.filter-app-entries(search-query);
+        }
       }
     }
 
-    if UIState.appEntries.length == 0: Rectangle {}
-    if UIState.appEntries.length > 0: VerticalLayout {
+    if TabletUIState.app-entries.length == 0: Rectangle {}
+    if TabletUIState.app-entries.length > 0: VerticalLayout {
       vertical-stretch: 1;
 
       List {
-        for entry in UIState.appEntries: ListItem {
+        for entry in TabletUIState.app-entries: ListItem {
           height: 55px;
 
           //if search-query !==
@@ -159,7 +167,6 @@ export component AppSelectionModal inherits FadeModal {
       }
     }
 
-
     actions := HorizontalLayout {
       height: 50px;
 
@@ -188,7 +195,7 @@ export component AppSelectionModal inherits FadeModal {
             mouse-cursor: MouseCursor.pointer;
 
             clicked => {
-              UIState.show-app-selection-modal = false;
+              TabletUIState.show-app-selection-modal = false;
             }
 
             Text {

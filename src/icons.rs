@@ -29,7 +29,7 @@ impl IconManager {
     let config_dir = std::env::var("XDG_CONFIG_HOME")
       .unwrap_or(format!("{home_dir}/.config"));
     let config_dir = PathBuf::from(format!(
-      "{config_dir}/hypr/icons.cache"
+      "{config_dir}/hyprmaster/icons.cache"
     ));
 
     _ = config.load(config_dir.to_str().unwrap());
@@ -205,6 +205,9 @@ impl IconManager {
 
         let entry = entry.unwrap();
         let path = entry.path();
+        if !path.is_file() {
+          continue;
+        }
 
         if file_matches_icon(path, icon_name) {
           let icn_path =
@@ -230,6 +233,10 @@ impl IconManager {
 
         let entry = entry.unwrap();
         let path = entry.path();
+
+        if !path.is_file() {
+          continue;
+        }
 
         if file_matches_icon(path, icon_name) {
           let icn_path =

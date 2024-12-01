@@ -11,17 +11,15 @@ export global UIColors {
   out property <brush> text: #A3ABB6;
 }
 
-
 export struct AppEntry {
   name: string,
   description: string,
   wm_class: string,
   icon: image,
+  fade: bool
 }
 
 export global UIState {
-  in-out property <string> testStr: "pristine";
-
   in-out property <[AppEntry]> appEntries;
   in-out property <bool> show-app-selection-modal: false;
 

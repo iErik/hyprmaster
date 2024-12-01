@@ -22,7 +22,6 @@ export component SectionTitle inherits VerticalLayout {
   textEl := Text {
     color: rgba(163, 171, 182, 1);
     font-size: 16px;
-    font-family: "Ubuntu";
     font-weight: 600;
   }
 }
@@ -58,7 +57,6 @@ export component SectionBox inherits Rectangle {
       Text {
         text: title;
         font-size: 15px;
-        font-family: "Ubuntu";
         font-weight: 300;
         color: rgba(163, 171, 182, 1);
       }
@@ -67,5 +65,17 @@ export component SectionBox inherits Rectangle {
     Separator {}
 
     @children
+  }
+}
+
+export component Section inherits Rectangle {
+  in property <string> title;
+
+  VerticalLayout {
+    alignment: start;
+    padding-left: 15px;
+    padding-right: 15px;
+
+    SectionTitle { text: title; }
   }
 }

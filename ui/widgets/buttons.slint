@@ -1,5 +1,3 @@
-
-
 export component ActionBtn inherits HorizontalLayout {
   in property <image> icon-left  <=> imgLeft.source;
   in property <image> icon-right <=> imgRight.source;
@@ -11,11 +9,6 @@ export component ActionBtn inherits HorizontalLayout {
 
   Rectangle {
     height: 45px;
-    /*
-    background: tArea.has-hover
-      ? rgba(217, 217, 217, 0.08)
-      : rgba(217, 217, 217, 0.22);
-    */
     background:
       tArea.pressed
         ? rgba(217, 217, 217, 0.08)
