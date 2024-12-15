@@ -4,6 +4,9 @@ use std::thread;
 use slint::{Model, ModelNotify, Rgba8Pixel};
 use tokio::sync::mpsc::unbounded_channel;
 
+extern crate unicode_normalization;
+use unicode_normalization::UnicodeNormalization;
+
 use crate::ui::{self, AppEntry};
 use crate::apps::{self, DesktopEntry};
 
@@ -80,9 +83,13 @@ impl SharedModel {
     let test = self.entries.clone();
     //let test = test.get_mut().unwrap();
     let mut test = test.lock().unwrap();
-    let query_vec: Vec<&str> = String::from(query.clone())
-      .split(' ')
-      .collect();
+    let query_vec: Vec<&str> = query.split(' ').collect();
+
+    for word in query_vec {
+      for n in word.nfd() {
+        println!("norm: {:#?}", n);
+      }
+    }
 
     let matches = move |name: slint::SharedString| {
       let name_vec: Vec<&str> = String::from(name.clone())
@@ -228,7 +235,7 @@ impl Model for AppEntriesModel {
   type Data = AppEntry;
 
   fn row_count(&self) -> usize {
-    let entries = self.entries.read().expect(concat!(
+    let entries = self.entries.lock().expect(concat!(
       "AppEntriesModel.row_count: ",
       "app_entries lock is poisoned"
     ));
@@ -237,7 +244,7 @@ impl Model for AppEntriesModel {
   }
 
   fn row_data(&self, row: usize) -> Option<Self::Data> {
-    let entries = self.entries.read().expect(concat!(
+    let entries = self.entries.lock().expect(concat!(
       "AppEntriesModel.row_data: ",
       "app_entries lock is poisoned"
     ));
