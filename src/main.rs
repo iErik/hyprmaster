@@ -6,9 +6,6 @@ mod tablet;
 mod xdg;
 mod models;
 
-// TEMP:
-//mod old;
-
 pub mod ui {
   slint::include_modules!();
 }
@@ -32,8 +29,6 @@ fn main() -> Result<(), slint::PlatformError> {
   let model_rc = ModelRc::from(app_entries.clone());
   let app_entries_handle = app_entries.clone();
 
-  //let arc = Arc::new(&app_entries);
-  //let arg = Arc::
   let arc = main_window.as_weak();
 
   tablet_state.set_app_entries(model_rc);
@@ -46,20 +41,13 @@ fn main() -> Result<(), slint::PlatformError> {
     });
   });
 
-  //tablet_state.on_filter_app_entries(move |query| {});
-  //
   std::thread::spawn(move || {
-    std::thread::sleep(std::time::Duration::from_secs(10));
     let handle = arc.clone();
-    //let test = arb.clone();
-    //println!("Entries: {:#?}", arb);
 
     slint::invoke_from_event_loop(move || {
       let h = handle.upgrade().unwrap();
       let state = h.global::<TabletUIState>();
       let entries = state.get_app_entries();
-
-      //println!("Entries: {:#?}", test);
     })
   });
 
