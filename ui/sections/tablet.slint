@@ -10,6 +10,8 @@ import { LineEdit } from "../widgets/input.slint";
 
 import { UIState, AppEntry } from "../globals.slint";
 
+
+
 export global TabletUIState {
   in-out property <[AppEntry]> app-entries;
   in-out property <bool> show-app-selection-modal: false;
@@ -18,6 +20,7 @@ export global TabletUIState {
   callback fetch-app-entries;
   callback filter-app-entries(string);
 }
+
 
 export component TabletSection inherits Section {
   title: "Drawing Tablet";
@@ -132,7 +135,10 @@ export component AppSelectionModal inherits FadeModal {
         for entry in TabletUIState.app-entries: ListItem {
           height: 55px;
 
-          //if search-query !==
+          opacity: entry.fade ? 0.2 : 1.0;
+
+          //animate x, y { duration: 600ms; }
+          animate opacity { duration: 1s; }
 
           VerticalLayout {
             alignment: center;

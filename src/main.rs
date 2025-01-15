@@ -4,51 +4,62 @@ mod theme;
 mod apps;
 mod tablet;
 mod xdg;
-mod models;
+mod utils;
 
 pub mod ui {
   slint::include_modules!();
 }
 
 use ui::*;
-use models::app_entries::AppEntriesModel;
+use apps::SharedModel;
 
 use std::sync::Arc;
-use std::rc::Rc;
-use slint::{self, ModelRc};
+use std::rc::{Rc, Weak};
+use std::cell::RefCell;
+use slint::{self, ModelRc, Model};
+
 
 fn main() -> Result<(), slint::PlatformError> {
   let main_window = Arc::new(MainWindow::new().unwrap());
   let tablet_state = main_window.global::<TabletUIState>();
 
-  let raw_entries = AppEntriesModel::new();
-  let arg = Arc::new(raw_entries);
-  let arb = Arc::downgrade(&arg);
+  let shared_model = SharedModel::new();
+  let shared_model_rc = Rc::new(shared_model);
 
-  let app_entries = Rc::new(Arc::into_inner(arg).unwrap());
-  let model_rc = ModelRc::from(app_entries.clone());
-  let app_entries_handle = app_entries.clone();
+  let shared_model_rc_a = Rc::clone(&shared_model_rc);
+  //let shared_model_rc_b = Rc::new(RefCell::new(shared_model));
+  let shared_model_rc_b = Rc::clone(&shared_model_rc_a);
 
-  let arc = main_window.as_weak();
+  //let model_cell  = RefCell::new(shared_model);
 
-  tablet_state.set_app_entries(model_rc);
+  //let shared_model_rcl = Rc::new(RefCell::new(shared_model));
+  let shared_mrc  = ModelRc::from(shared_model_rc.clone());
+
+
+  tablet_state.set_app_entries(shared_mrc);
 
   tablet_state.on_fetch_app_entries(move || {
-    let handle = app_entries_handle.clone();
+    println!("App entries requested.");
+    let handle = shared_model_rc_a.clone();
+    //let handle = handle.upgrade().unwrap();
 
     _ = slint::spawn_local(async move {
       handle.populate_async().await
-    });
+    }).unwrap();
   });
 
-  std::thread::spawn(move || {
-    let handle = arc.clone();
+  tablet_state.on_filter_app_entries(move |query| {
+    //let handle = Rc::downgrade(&shared_model_rc);
+    //let mut handle = handle.upgrade().unwrap();
+    //let handle = Rc::get_mut(&mut handle);
+    let handle = shared_model_rc_b.clone();
+    //let handle = handle.borrow_mut();
+    //let handle = Rc::get_mut(&mut handle).expect("You suck.");
+    //let mut handle = Rc::into_inner(handle).expect("YOU SUCKKKK");
 
-    slint::invoke_from_event_loop(move || {
-      let h = handle.upgrade().unwrap();
-      let state = h.global::<TabletUIState>();
-      let entries = state.get_app_entries();
-    })
+    _ = slint::spawn_local(async move {
+      handle.filter_entries(&query).await;
+    }).unwrap();
   });
 
   main_window.run()

@@ -5,6 +5,9 @@ use std::collections::HashMap;
 use ini::configparser::ini::Ini;
 
 use crate::xdg::XDGPaths;
+use crate::ui::TabletUIState;
+
+
 
 type SectionMap = HashMap<String, Option<String>>;
 
@@ -14,18 +17,22 @@ pub struct TabletPreset {
   path: path::PathBuf,
 }
 
-pub struct TabletMaster {
+pub struct TabletMaster<'a> {
+  state: TabletUIState<'a>,
   presets: Vec<TabletPreset>,
   config: Ini,
 }
 
-impl TabletMaster {
-  pub fn new() -> Self {
+impl<'a> TabletMaster<'a> {
+  pub fn new(state: TabletUIState<'a>) -> Self {
     let mut config = Ini::new();
     let mut config_dir = XDGPaths::new().config_dir;
+
     config_dir.push("hyprmaster/tablet.conf");
     _ = config.load(config_dir.to_str().unwrap());
+
     Self {
+      state,
       presets: find_presets().unwrap_or(vec![]),
       config,
     }
@@ -50,6 +57,8 @@ impl TabletMaster {
     )
   }
 }
+
+
 
 pub fn find_presets() -> Option<Vec<TabletPreset>> {
   let mut presets_dir = XDGPaths::new().config_dir;

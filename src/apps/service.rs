@@ -6,33 +6,33 @@ use std::thread;
 use std::sync::{Arc, Mutex};
 
 use walkdir::WalkDir;
-use ini::configparser::ini::Ini;
 use freedesktop_entry_parser::parse_entry;
 
 use slint::Image;
 
-use crate::models::app_entries::SharedAppEntry;
 use crate::icons::IconManager;
 use crate::ui;
 
+
+
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct DesktopEntry {
-  pub name: String,
-  pub wm_class: String,
-  pub icon_path: PathBuf,
-  icon_name: String,
-  pub description: String,
-  exec: String,
-  entry_path: String,
-  pub no_display: bool,
-  pub terminal: bool,
+  icon_name       :String,
+  exec            :String,
+  entry_path      :String,
+  pub name        :String,
+  pub wm_class    :String,
+  pub icon_path   :PathBuf,
+  pub description :String,
+  pub no_display  :bool,
+  pub terminal    :bool,
 }
 
+
 impl PartialOrd for DesktopEntry {
-  fn partial_cmp(
-    &self,
-    other: &Self,
-  ) -> Option<std::cmp::Ordering> {
+  fn partial_cmp(&self, other: &Self) ->
+    Option<std::cmp::Ordering>
+  {
     self.name.partial_cmp(&other.name)
   }
 }
@@ -43,17 +43,16 @@ impl Ord for DesktopEntry {
   }
 }
 
+
 impl From<&DesktopEntry> for ui::AppEntry {
   fn from(entry: &DesktopEntry) -> Self {
     Self {
-      name: entry.name.clone().into(),
+      name:        entry.name.clone().into(),
       description: entry.description.clone().into(),
-      wm_class: entry.wm_class.clone().into(),
-      icon: Image::load_from_path(
-        entry.icon_path.as_path(),
-      )
-      .unwrap(),
-      fade: false,
+      wm_class:    entry.wm_class.clone().into(),
+      icon:        Image::load_from_path(
+                     entry.icon_path.as_path()).unwrap(),
+      fade:        false,
     }
   }
 }
@@ -61,17 +60,17 @@ impl From<&DesktopEntry> for ui::AppEntry {
 impl From<DesktopEntry> for ui::AppEntry {
   fn from(entry: DesktopEntry) -> Self {
     Self {
-      name: entry.name.into(),
+      name:        entry.name.into(),
       description: entry.description.into(),
-      wm_class: entry.wm_class.into(),
-      icon: Image::load_from_path(
-        entry.icon_path.as_path(),
-      )
-      .unwrap(),
-      fade: false,
+      wm_class:    entry.wm_class.into(),
+      icon:        Image::load_from_path(
+                     entry.icon_path.as_path()).unwrap(),
+      fade:        false,
     }
   }
 }
+
+
 
 pub struct AppMaster {
   updated_at: SystemTime,
@@ -137,6 +136,7 @@ pub fn parse_app_entry(
     }
   }
 
+  // TODO: Icon fetching is a major issue here
   if entry.has_attr("Icon") {
     let icon: String = entry
       .attr("Icon")
@@ -150,6 +150,7 @@ pub fn parse_app_entry(
     app.icon_path = match path {
       Some(path) => path.into(),
       None => {
+        // TODO: Perhaps turn this into a constant
         path::absolute("ui/icons/3d-square.svg").unwrap()
       }
     };

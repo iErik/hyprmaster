@@ -1,13 +1,14 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::fs::FileType;
 use std::collections::HashSet;
 use std::process::Command;
 use std::ffi::OsStr;
-
 use std::cmp;
 
 use walkdir::{WalkDir, DirEntry};
 use ini::configparser::ini::Ini;
+
+
 
 pub struct IconManager {
   cache_src: PathBuf,
@@ -56,9 +57,13 @@ impl IconManager {
     &self,
     icn_name: &str,
   ) -> Option<String> {
-    self
-      .cache_map
-      .get(self.current_icon_theme.as_str(), icn_name)
+    let path :Option<String> = self.cache_map
+      .get(self.current_icon_theme.as_str(), icn_name);
+
+    return match Path::new(&path.clone()?).exists() {
+      true => path,
+      false => None
+    }
   }
 
   pub fn cache_set(
