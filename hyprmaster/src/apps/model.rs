@@ -1,9 +1,6 @@
 use std::sync::{Arc, Mutex, mpsc};
-use std::cell::{RefCell, RefMut};
-use std::rc::Rc;
+use std::cell::RefCell;
 use std::thread;
-
-use std::time::{Instant, Duration};
 
 use tokio::sync::mpsc::unbounded_channel;
 use slint::{
@@ -16,7 +13,7 @@ use slint::{
 };
 
 
-use crate::utils::{unaccent, matches};
+use crate::utils::matches;
 use crate::ui::{self, AppEntry};
 use crate::apps::{self, DesktopEntry};
 
@@ -39,6 +36,7 @@ impl PartialEq for SharedAppEntry {
     self.fade == other.fade
   }
 }
+
 
 impl Eq for SharedAppEntry { }
 
@@ -129,7 +127,6 @@ struct FilterHandle {
 
 pub struct SharedModel {
   pub entries: Arc<Mutex<Vec<SharedAppEntry>>>,
-  filter_handle: RefCell<FilterHandle>,
   notify: ModelNotify,
 }
 
@@ -139,12 +136,6 @@ impl SharedModel {
     SharedModel {
       entries: Arc::new(Mutex::new(vec![])),
       notify: ModelNotify::default(),
-
-      filter_handle: RefCell::new(FilterHandle {
-        query: SharedString::new(),
-        thread: None,
-        sender: None,
-      })
     }
   }
 
@@ -184,23 +175,23 @@ impl SharedModel {
     let q = Arc::new(q);
 
     thread::spawn(move || {
-        let q = q.clone();
-        let mut elock = entries.lock().unwrap();
+      let q = q.clone();
+      let mut elock = entries.lock().unwrap();
 
-        for entry in elock.iter_mut() {
+      for entry in elock.iter_mut() {
 
-          if q.trim() == "" {
-            entry.fade = false
-          } else if !matches(entry.name.as_str(), &q) {
-            entry.fade = true;
-          } else {
-            entry.fade = false;
-            println!("Matches!: {}", entry.name);
-          }
+        if q.trim() == "" {
+          entry.fade = false
+        } else if !matches(entry.name.as_str(), &q) {
+          entry.fade = true;
+        } else {
+          entry.fade = false;
+          println!("Matches!: {}", entry.name);
         }
+      }
 
-        elock.sort();
-        ssx.send(true).expect("Sender is poisoned");
+      elock.sort();
+      ssx.send(true).expect("Sender is poisoned");
     });
 
     while let Some(done) = rrx.recv().await {
