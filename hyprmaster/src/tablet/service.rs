@@ -1,13 +1,11 @@
-use std::time::SystemTime;
 use std::collections::{HashSet, HashMap};
 use std::path::{self, PathBuf};
-use std::thread;
-
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
+use std::thread;
 
 use walkdir::WalkDir;
 use freedesktop_entry_parser::parse_entry;
-
 use slint::Image;
 
 use crate::icons::IconManager;

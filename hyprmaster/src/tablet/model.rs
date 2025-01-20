@@ -1,5 +1,5 @@
-use std::sync::{Arc, Mutex, mpsc};
-use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
+use std::path::Path;
 use std::thread;
 
 use tokio::sync::mpsc::unbounded_channel;
@@ -14,8 +14,9 @@ use slint::{
 
 
 use crate::utils::matches;
-use crate::ui::{self, AppEntry};
-use crate::apps::{self, DesktopEntry};
+use crate::ui::AppEntry;
+
+use zaemon::DesktopEntry;
 
 
 
@@ -27,7 +28,6 @@ pub struct SharedAppEntry {
   pub fade:        bool,
 }
 
-
 impl PartialEq for SharedAppEntry {
   fn eq(&self, other: &Self) -> bool {
     self.name == other.name &&
@@ -36,7 +36,6 @@ impl PartialEq for SharedAppEntry {
     self.fade == other.fade
   }
 }
-
 
 impl Eq for SharedAppEntry { }
 
@@ -69,6 +68,30 @@ impl Ord for SharedAppEntry {
 }
 
 
+// TODO: Load fallback in case loading icon_path fails
+impl From<DesktopEntry> for SharedAppEntry {
+  fn from(entry: DesktopEntry) -> Self {
+    let img = match Image::load_from_path(
+      Path::new(entry.icon_path.as_str())
+    ) {
+      Ok(v) => v.to_rgba8_premultiplied(),
+      Err(err) => {
+        println!("Couldn't load image from path: {}", err);
+        None
+      }
+    };
+
+    Self {
+      name: entry.name.into(),
+      description: entry.description.into(),
+      wm_class: entry.wm_class.into(),
+      icon: img.unwrap(),
+      fade: false,
+    }
+  }
+}
+
+
 impl From<SharedAppEntry> for AppEntry {
   fn from(entry: SharedAppEntry) -> Self {
     Self {
@@ -95,78 +118,19 @@ impl From<&SharedAppEntry> for AppEntry {
 }
 
 
-// TODO: Load fallback in case loading icon_path fails
-impl From<DesktopEntry> for SharedAppEntry {
-  fn from(entry: DesktopEntry) -> Self {
-    let img = match Image::load_from_path(
-      entry.icon_path.as_path()
-    ) {
-      Ok(v) => v.to_rgba8_premultiplied(),
-      Err(err) => {
-        println!("Couldn't load image from path: {}", err);
-        None
-      }
-    };
 
-    Self {
-      name: entry.name.into(),
-      description: entry.description.into(),
-      wm_class: entry.wm_class.into(),
-      icon: img.unwrap(),
-      fade: false,
-    }
-  }
-}
-
-
-struct FilterHandle {
-  query: SharedString,
-  thread: Option<thread::JoinHandle<()>>,
-  sender: Option<mpsc::Sender<SharedString>>,
-}
-
-pub struct SharedModel {
+pub(super) struct AppEntries {
   pub entries: Arc<Mutex<Vec<SharedAppEntry>>>,
   notify: ModelNotify,
 }
 
-
-impl SharedModel {
+impl AppEntries {
   pub fn new() -> Self {
-    SharedModel {
+    Self {
       entries: Arc::new(Mutex::new(vec![])),
       notify: ModelNotify::default(),
     }
   }
-
-  /*
-  async fn filterer_task(&self) {
-    let (sx, rx) = mpsc::channel::<SharedString>();
-    let handle   = self.filter_handle.try_borrow_mut();
-    let entries  = self.entries.clone();
-
-    // Question is, what happens with requests received
-    // while the thread is already in the process of
-    // filtering the list?
-    let thr_handle = thread::spawn(move || {
-      while let Ok(request) = rx.recv() {
-        let mut elock = entries.lock().unwrap();
-        println!("PERIODT");
-
-        for entry in elock.iter_mut() {
-
-          if !matches(entry.name.as_str(), request.as_str()) {
-            entry.fade = true;
-          } else {
-            println!("Matches!: {}", entry.name);
-          }
-        }
-
-        ssx.send(true).expect("Sender is poisoned");
-      }
-    });
-  }
-  */
 
   pub async fn filter_entries(&self, query: &str) {
     let (ssx, mut rrx) = unbounded_channel();
@@ -202,6 +166,7 @@ impl SharedModel {
   }
 
   pub async fn populate_async(&self) {
+    /*
     let (sx, mut rx)   = unbounded_channel();
     let entries_handle = self.entries.clone();
 
@@ -223,33 +188,27 @@ impl SharedModel {
 
       self.notify.row_added(0, lock.len());
     }
+    */
   }
 }
 
-impl Model for SharedModel {
+impl Model for  AppEntries {
   type Data = AppEntry;
 
   fn row_count(&self) -> usize {
-    let entries = self.entries.lock().expect(concat!(
-      "SharedModel.row_count: ",
-      "entries lock is poisoned"
-    ));
-
-    entries.len()
+    match self.entries.lock() {
+      Ok(v) => v.len(),
+      _ => 0
+    }
   }
 
   fn row_data(&self, row: usize) -> Option<Self::Data> {
-    let entries = self.entries.lock().expect(concat!(
-      "SharedModel.row_data:",
-      "entries lock is poisoned"
-    ));
+    let entries = self.entries.lock().unwrap();
 
-    let row = match entries.get(row) {
+    match entries.get(row) {
       Some(data) => Some(AppEntry::from(data)),
       None => None,
-    };
-
-    row
+    }
   }
 
   fn model_tracker(&self) -> &dyn slint::ModelTracker {
@@ -261,10 +220,3 @@ impl Model for SharedModel {
   }
 }
 
-
-
-struct AppEntriesCtrl {
-  window: ui::MainWindow,
-}
-
-impl AppEntriesCtrl {}

@@ -1,2 +1,4 @@
 [workspace]
-members = [ "hyprmaster", "daemon" ]
+members = [ "hyprmaster", "daemon", "zaemon" ]
+default-members = [ "hyprmaster" ]
+resolver = "2"
