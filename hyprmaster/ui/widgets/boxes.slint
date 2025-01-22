@@ -57,7 +57,7 @@ export component SectionBox inherits Rectangle {
       Text {
         text: title;
         font-size: 15px;
-        font-weight: 300;
+        font-weight: 400;
         color: rgba(163, 171, 182, 1);
       }
     }
@@ -77,5 +77,7 @@ export component Section inherits Rectangle {
     padding-right: 15px;
 
     SectionTitle { text: title; }
+
+    @children
   }
 }

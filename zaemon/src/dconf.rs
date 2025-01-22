@@ -25,18 +25,13 @@ pub fn get(
     Ok(Output { stdout, .. }) => {
       let stdout_string = String::from_utf8(stdout)
         .unwrap()
+        .trim()
         .replace("'", "")
+        .replace("@as", "")
         .replace("\"", "")
         .replace("\n", "");
 
-      let parts = stdout_string.split(" ")
-        .collect::<Vec<&str>>();
-
-      if parts.len() > 1 {
-        return Ok(parts[1].trim().to_string());
-      }
-
-      Ok(stdout_string)
+      Ok(stdout_string.to_string())
     }
     Err(_) => Err("Unable to get key".to_string()),
   }
@@ -56,3 +51,4 @@ pub fn reset(key: &str, prop: &str) -> Result<(), String> {
 pub fn interface(prop: &str) -> Result<String, String>{
   get("org.gnome.desktop.interface", prop)
 }
+

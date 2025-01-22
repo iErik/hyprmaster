@@ -1,46 +1,63 @@
 use std::rc::Rc;
+use std::sync::Arc;
+use tokio::task;
 
 use slint::{spawn_local, ModelRc};
-use zbus::proxy;
 
 use crate::ui::TabletUIState;
-use super::model::AppEntries;
+use crate::services::apps::AppService;
+use super::model::{SharedAppEntries, LocalAppEntries};
 
 
 pub struct TabletController<'a> {
+  //app_entries: Rc<AppEntries>,
+  app_entries: Rc<LocalAppEntries>,
   state: TabletUIState<'a>,
-  app_entries: Rc<AppEntries>
+  service: Arc<AppService<'static>>,
 }
 
 impl<'a> TabletController<'a> {
-  pub fn new (global: TabletUIState<'a>) -> Self {
-    let app_entries_m = AppEntries::new();
+  pub fn new (
+    state: TabletUIState<'a>,
+    service: Arc<AppService<'static>>
+  ) -> Self {
+    //let app_entries_m = SharedAppEntries::new(service.clone());
+    let app_entries_m = LocalAppEntries::new(service.clone());
     let app_entries_rc = Rc::new(app_entries_m);
 
-
-    global.set_app_entries(
+    state.set_app_entries(
       ModelRc::from(app_entries_rc.clone())
     );
 
+    // TODO: Debt
+    /*
+    _ = spawn_local(async move {
+      handle.populate().await;
+    });
+    */
+
     let handle = app_entries_rc.clone();
-    global.on_fetch_app_entries(move || {
+    state.on_fetch_app_entries(move || {
       let handle = handle.clone();
       _ = spawn_local(async move {
-        handle.populate_async().await
+        handle.populate().await
       })
     });
 
+    /*
     let handle = app_entries_rc.clone();
-    global.on_filter_app_entries(move |query| {
+    state.on_filter_app_entries(move |query| {
       let handle = handle.clone();
       _ = spawn_local(async move {
         handle.filter_entries(&query).await
       })
     });
+    */
 
     Self {
       app_entries: app_entries_rc.clone(),
-      state: global
+      service,
+      state
     }
   }
 
@@ -50,11 +67,4 @@ impl<'a> TabletController<'a> {
 }
 
 
-#[proxy(
-  interface = "org.hypr.Hyprmaster.Apps",
-  default_service = "org.hypr.Hyprmaster",
-  default_path = "/apps"
-)]
-trait AppsProxy {
-  async fn all_apps(&self) -> zbus::Result<Vec<DesktopEntry>>;
-}
+

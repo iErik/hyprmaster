@@ -22,33 +22,35 @@ export global TabletUIState {
 }
 
 
-export component TabletSection inherits Section {
-  title: "Drawing Tablet";
-
+export component TabletSection inherits Rectangle {
   init => { TabletUIState.fetch-app-entries(); }
 
-  SectionBox {
-    icon: @image-url("../icons/link.svg");
-    title: "Application-specific presets";
+  Section {
+    title: "Drawing Tablet";
 
-    VerticalLayout {
-      padding-top: 15px;
-      padding-bottom: 15px;
+    SectionBox {
+      icon: @image-url("../icons/link.svg");
+      title: "Application-specific presets";
 
-      padding-left: 10px;
-      padding-right: 10px;
+      VerticalLayout {
+        padding-top: 15px;
+        padding-bottom: 15px;
 
-      alignment: center;
+        padding-left: 10px;
+        padding-right: 10px;
 
-      HorizontalLayout {
         alignment: center;
 
-        ActionBtn {
-          icon-left: @image-url("../icons/box.svg");
-          text: "Add application";
-          icon-right: @image-url("../icons/arrow-down.svg");
-          clicked => {
-            TabletUIState.show-app-selection-modal = true;
+        HorizontalLayout {
+          alignment: center;
+
+          ActionBtn {
+            icon-left: @image-url("../icons/box.svg");
+            text: "Add application";
+            icon-right: @image-url("../icons/arrow-down.svg");
+            clicked => {
+              TabletUIState.show-app-selection-modal = true;
+            }
           }
         }
       }
@@ -56,7 +58,7 @@ export component TabletSection inherits Section {
   }
 }
 
-export component List inherits Rectangle {
+component List inherits Rectangle {
   Flickable {
     width: 100%;
 
@@ -70,7 +72,7 @@ export component List inherits Rectangle {
   }
 }
 
-export component ListItem inherits Rectangle {
+component ListItem inherits Rectangle {
   border-radius: 8px;
   width: 100%;
   clip: true;

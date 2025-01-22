@@ -1,13 +1,16 @@
-
 use std::error::Error;
 use zbus::connection;
 
 
 mod dconf;
 mod objects;
+mod utils;
 
-use objects::{AppsObject, IconsObject};
-
+use objects::{
+  AppsObject,
+  IconsObject,
+  TabletInterface
+};
 
 
 
@@ -15,6 +18,7 @@ use objects::{AppsObject, IconsObject};
 async fn main() -> Result<(), Box<dyn Error>> {
   let icons = IconsObject::new();
   let apps = AppsObject::new();
+  let _tablet = TabletInterface::new();
 
   let conn = connection::Builder::session()?
     .name("org.hypr.Hyprmaster")?

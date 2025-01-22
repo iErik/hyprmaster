@@ -1,79 +1,15 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::HashSet;
 use std::path::{self, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
 use std::thread;
 
 use walkdir::WalkDir;
 use freedesktop_entry_parser::parse_entry;
-use slint::Image;
+use zaemon::apps::DesktopEntry;
 
 use crate::icons::IconManager;
-use crate::ui;
 
 
-
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct DesktopEntry {
-  icon_name       :String,
-  exec            :String,
-  entry_path      :String,
-  pub name        :String,
-  pub wm_class    :String,
-  pub icon_path   :PathBuf,
-  pub description :String,
-  pub no_display  :bool,
-  pub terminal    :bool,
-}
-
-
-impl PartialOrd for DesktopEntry {
-  fn partial_cmp(&self, other: &Self) ->
-    Option<std::cmp::Ordering>
-  {
-    self.name.partial_cmp(&other.name)
-  }
-}
-
-impl Ord for DesktopEntry {
-  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    self.name.cmp(&other.name)
-  }
-}
-
-
-impl From<&DesktopEntry> for ui::AppEntry {
-  fn from(entry: &DesktopEntry) -> Self {
-    Self {
-      name:        entry.name.clone().into(),
-      description: entry.description.clone().into(),
-      wm_class:    entry.wm_class.clone().into(),
-      icon:        Image::load_from_path(
-                     entry.icon_path.as_path()).unwrap(),
-      fade:        false,
-    }
-  }
-}
-
-impl From<DesktopEntry> for ui::AppEntry {
-  fn from(entry: DesktopEntry) -> Self {
-    Self {
-      name:        entry.name.into(),
-      description: entry.description.into(),
-      wm_class:    entry.wm_class.into(),
-      icon:        Image::load_from_path(
-                     entry.icon_path.as_path()).unwrap(),
-      fade:        false,
-    }
-  }
-}
-
-
-
-pub struct AppMaster {
-  updated_at: SystemTime,
-  app_entries: HashMap<String, DesktopEntry>,
-}
 
 pub fn parse_app_entry(
   desktop_file_path: PathBuf,
@@ -149,14 +85,19 @@ pub fn parse_app_entry(
       Some(path) => path.into(),
       None => {
         // TODO: Perhaps turn this into a constant
-        path::absolute("ui/icons/3d-square.svg").unwrap()
+        path::absolute("ui/icons/3d-square.svg")
+          .unwrap()
+          .to_string_lossy()
+          .to_string()
       }
     };
 
     app.icon_name = icon;
   } else {
-    app.icon_path =
-      path::absolute("ui/icons/3d-square.svg").unwrap();
+    app.icon_path = path::absolute("ui/icons/3d-square.svg")
+      .unwrap()
+      .to_string_lossy()
+      .to_string();
   }
 
   if entry.has_attr("StartupWMClass") {
@@ -264,3 +205,4 @@ pub fn get_apps() -> Vec<DesktopEntry> {
   apps.sort();
   apps
 }
+

@@ -1,29 +1,21 @@
 use std::fmt::{self, Display, Formatter};
-use std::path::{Path, PathBuf};
 use std::time::Duration;
+use std::path::PathBuf;
 use std::error::Error;
 use std::boxed::Box;
 
+
 use notify_debouncer_full::{
   notify::{
-    self,
-    Event,
-    EventHandler,
     EventKind as EvKind,
     RecursiveMode
   },
-  new_debouncer,
-  DebouncedEvent,
-  DebounceEventResult,
-  DebounceEventHandler
+  new_debouncer
 };
 
 use tokio::{
   task::JoinSet,
-  sync::mpsc::{
-    UnboundedSender,
-    unbounded_channel as channel
-  }
+  sync::mpsc::unbounded_channel as channel
 };
 
 use freedesktop_entry_parser::{
@@ -44,6 +36,7 @@ use async_stream::stream;
 use futures_core::stream::Stream;
 use futures_util::{stream::StreamExt, pin_mut};
 
+use crate::utils::notify::DebouncedSender;
 use super::IconsObject;
 
 
@@ -89,53 +82,7 @@ impl Ord for DesktopEntry {
 }
 
 
-#[derive(Debug)]
-struct ErrNotFound;
-impl Error for ErrNotFound {}
-
-#[derive(Debug)]
-struct ErrRequiresMut;
-impl Error for ErrRequiresMut {}
-
-impl Display for ErrNotFound {
-  fn fmt (&self, f: &mut Formatter) -> fmt::Result {
-    write!(f, "ErrNotFound")
-  }
-}
-
-impl Display for ErrRequiresMut {
-  fn fmt (&self, f: &mut Formatter) -> fmt::Result {
-    write!(f, "ErrRequiresMut")
-  }
-}
-
-struct AsyncSender(UnboundedSender<notify::Result<Event>>);
-struct DebouncedSender(UnboundedSender<DebouncedEvent>);
-
-impl EventHandler for AsyncSender {
-  fn handle_event(&mut self, event: notify::Result<Event>) {
-    _ = self.0.send(event).expect("Sender not poisoned");
-  }
-}
-
-impl DebounceEventHandler for DebouncedSender {
-  fn handle_event(&mut self, ev: DebounceEventResult) {
-    match ev {
-      Ok(evs) => {
-        for event in evs {
-          _ = self.0.send(event)
-            .expect("Sender not poisoned");
-        }
-      },
-      Err(error) => {
-        println!("AsyncSender Error: {:#?}", error);
-      }
-    }
-  }
-}
-
-
-pub struct AppsObject {
+pub(crate) struct AppsObject {
   cache: Vec<DesktopEntry>,
 }
 
@@ -237,6 +184,7 @@ impl AppsObject {
 #[interface(name = "org.hypr.Hyprmaster.Apps")]
 impl AppsObject {
   fn all_apps(&self) -> Vec<DesktopEntry> {
+    println!("App list requested!");
     self.cache.clone()
   }
 
@@ -247,13 +195,11 @@ impl AppsObject {
     #[zbus(object_server)]
     srv: &ObjectServer
   ) -> zbus::fdo::Result<()> {
-    println!("WOW, I WANT TO REBUILD NOW....");
     let icns_intr = srv
       .interface::<_, IconsObject>("/icons").await
       .expect("Should fetch interface");
     let mut icns_intr = icns_intr.get_mut().await;
 
-    println!("CLEARNING THE CACHEEEEE.... WEEEEEE");
     self.cache.clear();
     let app_stream = get_apps_stream();
     pin_mut!(app_stream);
@@ -272,7 +218,6 @@ impl AppsObject {
     self.cache.sort();
     sig_emitter.app_list_changed().await
       .expect("Should emit app_list_changed signal");
-    println!("I FINISHED REBUILDING :D");
 
     Ok(())
   }
@@ -374,7 +319,7 @@ pub fn app_lookup_dirs() -> Vec<PathBuf> {
   lookup_dirs
 }
 
-async fn get_apps() -> Vec<DesktopEntry> {
+pub async fn get_apps() -> Vec<DesktopEntry> {
   let lookup_dirs = app_lookup_dirs();
 
   let mut apps: Vec<DesktopEntry> = Vec::new();
@@ -480,5 +425,26 @@ fn make_entry(path: PathBuf) -> Option<DesktopEntry> {
     no_display: entry.get_bool("NoDisplay"),
     terminal: entry.get_bool("Terminal")
   })
+}
+
+
+#[derive(Debug)]
+struct ErrNotFound;
+impl Error for ErrNotFound {}
+
+#[derive(Debug)]
+struct ErrRequiresMut;
+impl Error for ErrRequiresMut {}
+
+impl Display for ErrNotFound {
+  fn fmt (&self, f: &mut Formatter) -> fmt::Result {
+    write!(f, "ErrNotFound")
+  }
+}
+
+impl Display for ErrRequiresMut {
+  fn fmt (&self, f: &mut Formatter) -> fmt::Result {
+    write!(f, "ErrRequiresMut")
+  }
 }
 
