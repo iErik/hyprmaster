@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::env::var;
+use std::io::ErrorKind as IOErr;
 use tokio::net::UnixStream;
 
 use zbus::interface;
@@ -15,7 +16,6 @@ pub(crate) struct TabletInterface {
   app_bindings: TabletBindings
 }
 
-// Save tablet settings into gsettings
 #[interface(name = "org.hypr.Hyprmaster.Tablet")]
 impl TabletInterface {
   #[zbus(property)]
@@ -43,19 +43,54 @@ impl TabletInterface {
     }
   }
 
-  pub async fn listen(conn: &zbus::Connection) ->
+  pub async fn listen() ->
     Result<(), Box<dyn std::error::Error>>
   {
-    let rtm_dir = var("XDG_RUNTINE_DIR")?;
+    println!("Setting up Tablet listener");
+    let rtm_dir = var("XDG_RUNTIME_DIR")?;
     let his_dir = var("HYPRLAND_INSTANCE_SIGNATURE")?;
+
     let sock_src = format!(
       "{rtm_dir}/hypr/{his_dir}/.socket2.sock");
+    println!("sock_src: {:#?}", sock_src);
 
     let sock = UnixStream::connect(sock_src).await?;
+
+    println!("Sock: {:#?}", sock);
+
+    loop {
+      println!("Waiting for socket to become readable...");
+      sock.readable().await?;
+      println!("Socket is now readable.");
+
+      let mut buf = [0; 4096];
+
+      match sock.try_read(&mut buf) {
+        Ok(0) => {
+          println!("0 bytes read");
+          break
+        },
+        Ok(n) => {
+          println!("read {} bytes", n);
+        },
+        Err(ref e) if e.kind() == IOErr::WouldBlock => {
+          continue;
+        },
+        Err(e) => {
+          println!("Received error: {:#?}", e);
+          return Err(e.into());
+        }
+      }
+
+      let text = String::from_utf8(Vec::from(&buf))?;
+      println!("Here, text: {}", text);
+    }
 
     Ok(())
   }
 }
+
+
 
 fn get_presets() -> Vec<String> {
   let base_dir    = "OpenTabletDriver/Presets";
