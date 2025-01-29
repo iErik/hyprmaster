@@ -1,219 +1,266 @@
 import {
   Section,
   SectionBox,
-  SectionTitle
-} from "../widgets/boxes.slint";
+  SectionTitle,
+  Separator,
 
-import { ActionBtn } from "../widgets/buttons.slint";
-import { FadeModal } from "../widgets/modal.slint";
-import { LineEdit } from "../widgets/input.slint";
+  List,
+  ListItem
+} from "@widgets/boxes.slint";
 
-import { UIState, AppEntry } from "../globals.slint";
+import {
+  ActionBtn,
+  SelectButton
+} from "@widgets/buttons.slint";
+
+import { Overlay } from "@widgets/modal.slint";
+import { LineEdit } from "@widgets/input.slint";
+
+import { AppEntry, Theme } from "@ui/globals.slint";
 
 
+
+export struct AppBinding {
+  preset :string,
+  app    :AppEntry,
+}
 
 export global TabletUIState {
-  in-out property <[AppEntry]> app-entries;
-  in-out property <bool> show-app-selection-modal: false;
+  in-out property <[AppEntry]>   app-entries;
+  in-out property <[AppBinding]> bindings;
+  in-out property <[string]>     presets;
 
   in-out property <string> search-query;
-  callback fetch-app-entries;
   callback filter-app-entries(string);
+  callback change-binding(app: string, preset: string);
+  callback add-binding(app: string, preset: string);
+  callback remove-binding(app: string);
 }
 
 
-export component TabletSection inherits Rectangle {
-  init => { TabletUIState.fetch-app-entries(); }
 
+component AppsOverlay inherits VerticalLayout {
+  property <string> search-query;
+  property <[AppEntry]> entries <=>
+    TabletUIState.app-entries;
+
+  callback cancel <=> cancelBtn.clicked;
+
+  alignment: stretch;
+  height: 100%;
+
+  header := HorizontalLayout {
+    alignment: center;
+    padding-top: 10px;
+    height: 60px;
+
+    search-field := LineEdit {
+      placeholder-text: "Search applications...";
+      placeholder-color: Theme.fg.placeholder;
+      text-color: Theme.fg.text;
+      text <=> search-query;
+      font-size: 14px;
+      width: 250px;
+      margin: 10px;
+      horizontal-alignment: TextHorizontalAlignment.center;
+
+      changed => {
+        TabletUIState.filter-app-entries(search-query);
+      }
+    }
+  }
+
+  if entries.length == 0: Rectangle {}
+
+  if entries.length > 0: VerticalLayout {
+    vertical-stretch: 1;
+
+    List {
+      for entry in TabletUIState.app-entries: ListItem {
+        height: 55px;
+
+        opacity: entry.fade ? 0.2 : 1.0;
+
+        animate opacity { duration: 300ms; }
+
+        VerticalLayout {
+          alignment: center;
+          Image {
+            width: 38px;
+            height: 38px;
+            source: entry.no_icon
+              ? @image-url("3d-square.svg")
+              : entry.icon;
+          }
+        }
+
+        VerticalLayout {
+          alignment: center;
+          spacing: 2px;
+          padding-left: 8px;
+
+          Text {
+            text: entry.name;
+            font-size: 14px;
+            font-weight: 600;
+            color: Theme.fg.text;
+          }
+
+          Text {
+            text: entry.description;
+            font-size: 12px;
+            font-weight: 400;
+            overflow: TextOverflow.elide;
+            color: Theme.fg.text;
+          }
+        }
+      }
+    }
+  }
+
+  actions := HorizontalLayout {
+    height: 50px;
+
+    Rectangle {
+      background: rgba(46, 49, 50, 0.4);
+
+      HorizontalLayout {
+        TouchArea {
+          mouse-cursor: MouseCursor.pointer;
+
+          Text {
+            text: "Select";
+            font-size: 16px;
+            color: Theme.fg.text;
+          }
+        }
+
+        Rectangle {
+          height: parent.height - 6px;
+          width: 1px;
+          y: 3px;
+          background: rgba(217, 217, 217, 0.06);
+        }
+
+        cancelBtn := TouchArea {
+          mouse-cursor: MouseCursor.pointer;
+
+          Text {
+            text: "Cancel";
+            font-size: 16px;
+            color: Theme.fg.text;
+          }
+        }
+      }
+    }
+  }
+}
+
+component TabletBinding inherits VerticalLayout {
+  in property <AppBinding> binding;
+
+  alignment: center;
+
+  HorizontalLayout {
+    padding-bottom: 9px;
+    z: 10;
+
+    alignment: stretch;
+
+    HorizontalLayout {
+      VerticalLayout {
+        alignment: center;
+
+        Image {
+          width: 38px;
+          height: 38px;
+          source: binding.app.no_icon
+            ? @image-url("3d-square.svg")
+            : binding.app.icon;
+        }
+      }
+
+      VerticalLayout {
+        alignment: center;
+        padding-left: 8px;
+
+        Text {
+          text: binding.app.name;
+          font-size: 14px;
+          font-weight: 400;
+          color: Theme.fg.text;
+        }
+      }
+    }
+
+    HorizontalLayout {
+      padding-right: 12px;
+
+      SelectButton {
+        text: binding.preset;
+        options: TabletUIState.presets;
+      }
+    }
+  }
+
+  Separator { z: 1; }
+}
+
+component TabletBindingList inherits VerticalLayout {
+  in property <[AppBinding]> bindings;
+
+  alignment: stretch;
+
+  for binding in bindings: TabletBinding {
+    binding: binding;
+  }
+}
+
+export component TabletSection inherits Rectangle {
   Section {
     title: "Drawing Tablet";
+    z: 10;
 
     SectionBox {
-      icon: @image-url("../icons/link.svg");
+      icon: @image-url("link.svg");
       title: "Application-specific presets";
 
       VerticalLayout {
         padding-top: 15px;
         padding-bottom: 15px;
 
-        padding-left: 10px;
-        padding-right: 10px;
+        padding-left: 15px;
+        padding-right: 15px;
 
         alignment: center;
 
+        TabletBindingList {
+          bindings: TabletUIState.bindings;
+        }
+
         HorizontalLayout {
           alignment: center;
+          padding-top: 15px;
 
           ActionBtn {
-            icon-left: @image-url("../icons/box.svg");
+            icon-left: @image-url("box.svg");
             text: "Add application";
-            icon-right: @image-url("../icons/arrow-down.svg");
-            clicked => {
-              TabletUIState.show-app-selection-modal = true;
-            }
+            icon-right: @image-url("arrow-down.svg");
+
+            clicked => { overlay.active = true; }
           }
         }
       }
     }
   }
-}
 
-component List inherits Rectangle {
-  Flickable {
-    width: 100%;
+  overlay := Overlay {
+    active: false;
 
-    VerticalLayout {
-      padding: 10px;
-      spacing: 5px;
-      alignment: start;
-
-      @children
+    AppsOverlay {
+      cancel => { overlay.active = false; }
     }
   }
 }
 
-component ListItem inherits Rectangle {
-  border-radius: 8px;
-  width: 100%;
-  clip: true;
 
-  background: area.has_hover
-    ? rgba(46, 49, 50, 0.4)
-    : rgba(46, 49, 50, 0.0);
-
-  animate background {
-    duration: 500ms;
-    easing: ease-out-expo;
-  }
-
-  area := TouchArea {
-    mouse-cursor: MouseCursor.pointer;
-    width: 100%;
-    height: 100%;
-  }
-
-  HorizontalLayout {
-    alignment: start;
-    padding: 10px;
-
-    @children
-  }
-}
-
-export component AppSelectionModal inherits FadeModal {
-  private property <string> search-query;
-
-
-  VerticalLayout {
-    alignment: stretch;
-    height: 100%;
-
-    header := HorizontalLayout {
-      alignment: center;
-      padding-top: 10px;
-      height: 60px;
-
-      search-field := LineEdit {
-        placeholder-text: "Search applications...";
-        placeholder-color: rgba(163, 171, 182, 0.5);
-        text-color: rgba(163, 171, 182, 0.9);
-        text <=> search-query;
-        font-size: 14px;
-        width: 250px;
-        margin: 10px;
-        horizontal-alignment: TextHorizontalAlignment.center;
-
-        changed => {
-          TabletUIState.filter-app-entries(search-query);
-        }
-      }
-    }
-
-    if TabletUIState.app-entries.length == 0: Rectangle {}
-    if TabletUIState.app-entries.length > 0: VerticalLayout {
-      vertical-stretch: 1;
-
-      List {
-        for entry in TabletUIState.app-entries: ListItem {
-          height: 55px;
-
-          opacity: entry.fade ? 0.2 : 1.0;
-
-          //animate x, y { duration: 600ms; }
-          animate opacity { duration: 1s; }
-
-          VerticalLayout {
-            alignment: center;
-            Image {
-              source: entry.icon;
-              width: 38px;
-              height: 38px;
-            }
-          }
-
-          VerticalLayout {
-            alignment: center;
-            spacing: 2px;
-            padding-left: 8px;
-
-            Text {
-              text: entry.name;
-              font-size: 14px;
-              font-weight: 600;
-              color: rgba(163, 171, 182, 0.9);
-            }
-
-            Text {
-              text: entry.description;
-              font-size: 12px;
-              font-weight: 400;
-              overflow: TextOverflow.elide;
-              color: rgba(163, 171, 182, 0.9);
-            }
-          }
-        }
-      }
-    }
-
-    actions := HorizontalLayout {
-      height: 50px;
-
-      Rectangle {
-        background: rgba(46, 49, 50, 0.4);
-
-        HorizontalLayout {
-          TouchArea {
-            mouse-cursor: MouseCursor.pointer;
-
-            Text {
-              text: "Select";
-              font-size: 16px;
-              color: rgba(163, 171, 182, 0.9);
-            }
-          }
-
-          Rectangle {
-            height: parent.height - 6px;
-            width: 1px;
-            y: 3px;
-            background: rgba(217, 217, 217, 0.06);
-          }
-
-          TouchArea {
-            mouse-cursor: MouseCursor.pointer;
-
-            clicked => {
-              TabletUIState.show-app-selection-modal = false;
-            }
-
-            Text {
-              text: "Cancel";
-              font-size: 16px;
-              color: rgba(163, 171, 182, 0.9);
-            }
-          }
-        }
-      }
-    }
-  }
-}

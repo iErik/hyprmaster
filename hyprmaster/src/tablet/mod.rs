@@ -1,7 +1,4 @@
-mod model;
-mod service;
+mod models;
 mod controller;
 
-pub use model::*;
-//pub use service::*;
 pub use controller::*;

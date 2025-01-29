@@ -1,21 +1,28 @@
-export component ActionBtn inherits HorizontalLayout {
+import { Theme } from "@ui/globals.slint";
+
+export component ActionBtn inherits TouchArea {
+  property <brush> pressed-color: Theme.bg.widgets;
+  property <brush> neutral-color: Theme.bg.widgets;
+  property <brush> hover-color:   Theme.bg.hover;
+
+  property <brush> text-color: Theme.fg.text;
+  property <brush> icon-color: Theme.fg.icon;
+
+
   in property <image> icon-left  <=> imgLeft.source;
   in property <image> icon-right <=> imgRight.source;
   in property <string> text      <=> txtEl.text;
 
-  callback clicked <=> tArea.clicked;
+  mouse-cursor: MouseCursor.pointer;
 
-  alignment: start;
-
-  Rectangle {
+  rec := Rectangle {
     height: 45px;
     background:
-      tArea.pressed
-        ? rgba(217, 217, 217, 0.08)
-        : tArea.has-hover
-          ? rgba(217, 217, 217, 0.22)
-          : rgba(217, 217, 217, 0.08);
-
+      root.pressed
+        ? pressed-color
+        : root.has-hover
+          ? hover-color
+          : neutral-color;
 
     border-radius: 5px;
 
@@ -71,9 +78,226 @@ export component ActionBtn inherits HorizontalLayout {
         }
       }
     }
+  }
+}
+
+
+
+export component BaseBtn inherits HorizontalLayout {
+  property <brush> neutral-color: rgba(217, 217, 217, 0.08);
+  property <brush> pressed-color: rgba(217, 217, 217, 0.08);
+  property <brush> hover-color:   rgba(217, 217, 217, 0.22);
+
+  callback clicked <=> tArea.clicked;
+
+  alignment: stretch;
+  max-width: 180px;
+
+  Rectangle {
+    height: 45px;
+    border-radius: 5px;
+
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+
+    background: tArea.pressed
+      ? pressed-color
+      : tArea.has-hover
+        ? hover-color
+        : neutral-color;
+
+
+    animate background {
+      duration: 300ms;
+      easing: ease-out-expo;
+    }
+
+    HorizontalLayout {
+      alignment: start;
+
+      @children
+    }
 
     tArea := TouchArea {
       mouse-cursor: MouseCursor.pointer;
     }
   }
 }
+
+// ---------------*
+// | Select Field |
+// ---------------*
+
+export component SelectButton {
+  in property <string> text <=> txtEl.text;
+  in property <[string]> options;
+
+  callback on-select(string);
+
+  property <bool> open: false;
+  property <length> max-w: 360px;
+
+  property <brush> pressed-color: Theme.bg.widgets;
+  property <brush> neutral-color: Theme.bg.widgets;
+  property <brush> hover-color:   Theme.bg.hover;
+
+  property <brush> text-color: Theme.fg.text;
+  property <brush> icon-color: Theme.fg.icon;
+
+  VerticalLayout {
+    alignment: stretch;
+    max-width: max-w;
+
+    btn := HorizontalLayout {
+      alignment: stretch;
+      max-width: max-w;
+
+      btnRec := Rectangle {
+        height: 45px;
+        border-radius: 8px;
+
+        background: tArea.pressed
+          ? pressed-color
+          : tArea.has-hover
+            ? hover-color
+            : neutral-color;
+
+        animate background {
+          duration: 300ms;
+          easing: ease-out-expo;
+        }
+
+        HorizontalLayout {
+          alignment: space-between;
+
+          VerticalLayout {
+            alignment: center;
+            padding-right: 8px;
+            padding-left: 15px;
+
+            txtEl := Text {
+              font-size: 13px;
+              font-family: "Ubuntu";
+              font-weight: 400;
+              color: text-color;
+            }
+          }
+
+          VerticalLayout {
+            alignment: center;
+            padding-right: 10px;
+            padding-left: 10px;
+
+            Image {
+              width: 14px;
+              height: 14px;
+              colorize: icon-color;
+              source: @image-url("arrow-down.svg");
+            }
+          }
+        }
+
+        tArea := TouchArea {
+          mouse-cursor: MouseCursor.pointer;
+
+          clicked => { open = !open; }
+        }
+      }
+    }
+  }
+
+  list := TouchArea {
+    max-width: max-w;
+
+    x: 0px;
+    y: btnRec.height;
+    z: 50;
+
+    listRec := Rectangle {
+      background: neutral-color;
+
+      border-bottom-left-radius: 5px;
+      border-bottom-right-radius: 5px;
+      clip: true;
+
+      VerticalLayout {
+        for option in options: TouchArea {
+          mouse-cursor: pointer;
+          clicked => {
+            on-select(option);
+            open = false;
+          }
+
+          Rectangle {
+            height: 45px;
+            background: parent.has-hover
+              ? hover-color
+              : transparent;
+
+            HorizontalLayout {
+              VerticalLayout {
+                alignment: center;
+                padding-left: 12px;
+
+                Text {
+                  font-size: 12px;
+                  font-family: "Ubuntu";
+                  font-weight: 400;
+                  color: text-color;
+                  text: option;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+
+  states [
+    open when open: {
+      btnRec.border-bottom-left-radius: 0px;
+      btnRec.border-bottom-right-radius: 0px;
+
+      list.height: options.length * 45px;
+    }
+
+    closed when !open: {
+      btnRec.border-bottom-left-radius: 8px;
+      btnRec.border-bottom-right-radius: 8px;
+
+      list.height: 0px;
+
+      in {
+        animate list.height {
+          duration: 600ms;
+          easing: ease-out-back;
+        }
+
+        animate
+          btnRec.border-bottom-left-radius,
+          btnRec.border-bottom-right-radius
+        {
+          duration: 650ms;
+        }
+      }
+
+      out {
+        animate list.height {
+          duration: 400ms;
+          easing: ease-out-quint;
+        }
+
+        animate
+          btnRec.border-bottom-left-radius,
+          btnRec.border-bottom-right-radius
+        {
+          duration: 100ms;
+        }
+
+      }
+    }
+  ]
+}
+

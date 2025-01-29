@@ -3,7 +3,10 @@ use std::time::Duration;
 use std::path::PathBuf;
 use std::error::Error;
 use std::boxed::Box;
+use std::sync::Arc;
 
+use serde_bytes::ByteBuf;
+//use serde_bytes::Bytes;
 
 use notify_debouncer_full::{
   notify::{
@@ -15,7 +18,8 @@ use notify_debouncer_full::{
 
 use tokio::{
   task::JoinSet,
-  sync::mpsc::unbounded_channel as channel
+  sync::mpsc::unbounded_channel as channel,
+  sync::RwLock
 };
 
 use freedesktop_entry_parser::{
@@ -23,12 +27,23 @@ use freedesktop_entry_parser::{
   Entry as EntryFile
 };
 
+use i_slint_core::graphics::{
+  SharedPixelBuffer,
+  Rgba8Pixel,
+  Image,
+};
+
 use zbus::{
   interface,
+  zvariant,
   ObjectServer,
   message::Message,
   names::MemberName,
-  object_server::{Interface, SignalEmitter, DispatchResult},
+  object_server::{
+    Interface,
+    SignalEmitter,
+    DispatchResult
+  },
 };
 
 use walkdir::WalkDir;
@@ -39,6 +54,47 @@ use futures_util::{stream::StreamExt, pin_mut};
 use crate::utils::notify::DebouncedSender;
 use super::IconsObject;
 
+
+
+#[derive(
+  serde::Serialize,
+  serde::Deserialize,
+  zvariant::Type,
+  Default,
+  Debug,
+  Clone,
+  PartialEq,
+  Eq
+)]
+pub struct SerialPixelBuffer {
+  width: u32,
+  height: u32,
+  #[serde(with = "serde_bytes")]
+  data: ByteBuf
+}
+
+type Rgba8Buffer = SharedPixelBuffer<Rgba8Pixel>;
+
+impl From<Rgba8Buffer> for SerialPixelBuffer {
+  fn from(mut buffer: Rgba8Buffer) -> Self {
+    Self {
+      width: buffer.width(),
+      height: buffer.height(),
+      data: ByteBuf::from(buffer
+        .make_mut_bytes().to_vec())
+    }
+  }
+}
+
+impl From<SerialPixelBuffer> for Rgba8Buffer {
+  fn from(sbuffer: SerialPixelBuffer) -> Self {
+    Rgba8Buffer::clone_from_slice(
+      sbuffer.data.as_slice(),
+      sbuffer.width,
+      sbuffer.height
+    )
+  }
+}
 
 
 #[derive(
@@ -58,12 +114,15 @@ pub struct DesktopEntry {
 
   pub icon_name   :String,
   pub icon_path   :String,
+  pub cached_icn  :SerialPixelBuffer,
+  pub no_icon     :bool,
 
   pub wm_class    :String,
   pub description :String,
 
   pub no_display  :bool,
   pub terminal    :bool,
+  pub fade        :bool,
 }
 
 
@@ -83,12 +142,14 @@ impl Ord for DesktopEntry {
 
 
 pub(crate) struct AppsObject {
-  cache: Vec<DesktopEntry>,
+  cache: Arc<RwLock<Vec<DesktopEntry>>>,
 }
 
 impl AppsObject {
   pub fn new() -> Self {
-    Self { cache: vec![] }
+    Self {
+      cache: Arc::new(RwLock::new(vec![])),
+    }
   }
 
   pub async fn trigger_cache_reset (
@@ -96,7 +157,8 @@ impl AppsObject {
   ) -> Result<(), Box<dyn Error>>
   {
     let member = MemberName::try_from("ResetCache")?;
-    let msg = Message::method_call("/apps", member.clone())?
+    let msg = Message::method_call("/apps",
+      member.clone())?
       .interface("org.hypr.Hyprmaster.Apps")?
       .build(&())?;
 
@@ -162,7 +224,8 @@ impl AppsObject {
             println!("Event received: {:#?}", ev);
             println!("Rebuilding cache: {:#?}", ev);
 
-            let res = Self::trigger_cache_reset(conn).await;
+            let res = Self::trigger_cache_reset(conn)
+              .await;
 
             if res.is_err() {
               println!("ResetCache error: {:#?}", res);
@@ -180,13 +243,14 @@ impl AppsObject {
 // - Filter method
 // - Proper icon_path resolution
 // - persistent caching
-// - apps changed/added/removed signals
 #[interface(name = "org.hypr.Hyprmaster.Apps")]
 impl AppsObject {
-  fn all_apps(&self) -> Vec<DesktopEntry> {
+  async fn all_apps(&self) -> Vec<DesktopEntry> {
     println!("App list requested!");
-    self.cache.clone()
+    let cache = self.cache.read().await;
+    cache.clone()
   }
+
 
   async fn reset_cache(
     &mut self,
@@ -194,31 +258,47 @@ impl AppsObject {
     sig_emitter: SignalEmitter<'_>,
     #[zbus(object_server)]
     srv: &ObjectServer
-  ) -> zbus::fdo::Result<()> {
+  ) ->
+    zbus::fdo::Result<()>
+  {
     let icns_intr = srv
-      .interface::<_, IconsObject>("/icons").await
-      .expect("Should fetch interface");
+      .interface::<_, IconsObject>("/icons").await?;
     let mut icns_intr = icns_intr.get_mut().await;
 
-    self.cache.clear();
+    let mut cache = self.cache.write().await;
+    cache.clear();
+
     let app_stream = get_apps_stream();
     pin_mut!(app_stream);
 
     while let Some(mut app) = app_stream.next().await {
       match app.icon_name.trim().is_empty() {
-        true => self.cache.push(app),
+        true => cache.push(app),
         false => {
           app.icon_path = icns_intr
             .get_icon(app.icon_name.as_str()).await;
-          self.cache.push(app);
+
+          let img = Image::load_from_path(
+            PathBuf::from(&app.icon_path).as_path());
+
+          if img.is_err() || app.icon_path.is_empty() {
+            app.no_icon = true;
+          } else {
+            app.cached_icn = img.unwrap()
+              .to_rgba8_premultiplied()
+              .unwrap()
+              .into()
+          }
+
+          cache.push(app);
         }
-      }
+      };
     }
 
-    self.cache.sort();
-    sig_emitter.app_list_changed().await
-      .expect("Should emit app_list_changed signal");
+    cache.sort();
+    sig_emitter.app_list_changed().await?;
 
+    println!("App cache rebuilt!");
     Ok(())
   }
 
@@ -229,60 +309,6 @@ impl AppsObject {
 }
 
 
-
-trait EntryAttrGetters {
-  fn get_bool(&self, attr: &str) -> bool;
-  fn get_str(&self, attr: &str) -> String;
-  fn wm_class(&self) -> String;
-  fn icon_name(&self) -> String;
-}
-
-impl EntryAttrGetters for EntryFile {
-  fn get_bool(&self, attr: &str) -> bool {
-    let sec = self.section("Desktop Entry");
-
-    match sec.attr(attr).unwrap_or("") {
-      "true" | "True" => true,
-      _ => false
-    }
-  }
-
-  fn get_str(&self, attr: &str) -> String {
-    self.section("Desktop Entry")
-      .attr(attr)
-      .unwrap_or("")
-      .into()
-  }
-
-  fn wm_class(&self) -> String {
-    let sec = self.section("Desktop Entry");
-
-    if sec.has_attr("StartupWMClass") {
-      return self.get_str("StartupWMClass")
-    }
-
-    if !sec.has_attr("Exec") {
-      return "".to_string()
-    }
-
-    let exec: String = self.get_str("Exec")
-      .split(' ').nth(0).unwrap_or("".into()).to_string();
-
-    match PathBuf::from(&exec).exists() {
-      true => PathBuf::from(exec)
-        .file_stem().unwrap()
-        .to_string_lossy()
-        .to_string(),
-      _ => String::from("")
-    }
-  }
-
-  fn icon_name(&self) -> String {
-    self.get_str("Icon")
-      .replace('"', "")
-      .replace('\'', "")
-  }
-}
 
 
 pub fn app_lookup_dirs() -> Vec<PathBuf> {
@@ -323,7 +349,7 @@ pub async fn get_apps() -> Vec<DesktopEntry> {
   let lookup_dirs = app_lookup_dirs();
 
   let mut apps: Vec<DesktopEntry> = Vec::new();
-  let mut set: JoinSet<Option<DesktopEntry>> = JoinSet::new();
+  let mut set = JoinSet::new();
 
   for dir in lookup_dirs {
     if !dir.exists() { continue; }
@@ -359,7 +385,7 @@ pub async fn get_apps() -> Vec<DesktopEntry> {
 fn get_apps_stream() -> impl Stream<Item = DesktopEntry>
 {
   let lookup_dirs = app_lookup_dirs();
-  let mut set: JoinSet<Option<DesktopEntry>> = JoinSet::new();
+  let mut set = JoinSet::new();
 
   for dir in lookup_dirs {
     if !dir.exists() { continue; }
@@ -411,20 +437,81 @@ fn make_entry(path: PathBuf) -> Option<DesktopEntry> {
 
     icon_name: entry.icon_name(),
     icon_path: String::from(""),
-    /*
-    icon_path: match entry.icon_name().trim() {
-      "" => String::from(""),
-      _ => get_icon_sync(&entry.icon_name())
-        .unwrap_or("".to_string())
-    },
-    */
 
     description: entry.get_str("Comment"),
     wm_class: entry.wm_class(),
 
     no_display: entry.get_bool("NoDisplay"),
-    terminal: entry.get_bool("Terminal")
+    terminal: entry.get_bool("Terminal"),
+
+    fade: false,
+    no_icon: false,
+    cached_icn: SerialPixelBuffer::default(),
   })
+}
+
+
+trait EntryAttrGetters {
+  fn get_bool(&self, attr: &str) -> bool;
+  fn get_str(&self, attr: &str) -> String;
+  fn wm_class(&self) -> String;
+  fn icon_name(&self) -> String;
+}
+
+impl EntryAttrGetters for EntryFile {
+  fn get_bool(&self, attr: &str) -> bool {
+    let sec = self.section("Desktop Entry");
+
+    match sec.attr(attr).unwrap_or("") {
+      "true" | "True" => true,
+      _ => false
+    }
+  }
+
+  fn get_str(&self, attr: &str) -> String {
+    self.section("Desktop Entry")
+      .attr(attr)
+      .unwrap_or("")
+      .into()
+  }
+
+  fn wm_class(&self) -> String {
+    let sec = self.section("Desktop Entry");
+
+    if sec.has_attr("StartupWMClass") {
+      return self.get_str("StartupWMClass")
+        .to_lowercase()
+    }
+
+    if !sec.has_attr("Exec") {
+      return "".to_string()
+    }
+
+    let exec: String = self.get_str("Exec")
+      .split(' ').nth(0).unwrap_or("").to_string();
+
+    /*
+    match PathBuf::from(&exec).exists() {
+      true => PathBuf::from(exec)
+        .file_stem().unwrap()
+        .to_string_lossy()
+        .to_string(),
+      false => PathBuf
+    }
+    */
+
+    PathBuf::from(exec)
+      .file_stem().unwrap()
+      .to_string_lossy()
+      .to_string()
+      .to_lowercase()
+  }
+
+  fn icon_name(&self) -> String {
+    self.get_str("Icon")
+      .replace('"', "")
+      .replace('\'', "")
+  }
 }
 
 

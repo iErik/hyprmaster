@@ -66,14 +66,14 @@ impl IconsObject {
 //   emit signals
 #[interface(name = "org.hypr.Hyprmaster.Icons")]
 impl IconsObject {
-  pub async fn get_icon(&mut self, icn_name: &str) -> String {
-    if let Some(icn) = self.cache_get(icn_name) {
+  pub async fn get_icon(&mut self, name: &str) -> String {
+    if let Some(icn) = self.cache_get(name) {
       return icn
     }
 
-    match get_icon(&icn_name.to_string()).await {
+    match get_icon(&name.to_string()).await {
       Some(result) => {
-        self.cache_set(icn_name, result.clone());
+        self.cache_set(name, result.clone());
         result
       },
       None => String::from("")

@@ -4,7 +4,7 @@
     id="org.hypr.Hyprmaster.tablet"
     path="/org/hypr/Hyprmaster/tablet/"
   >
-    <key name="bindings" type="a{sas}">
+    <key name="bindings" type="a{ss}">
       <default>[]</default>
       <summary>Custom application bindings</summary>
       <description>

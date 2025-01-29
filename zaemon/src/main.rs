@@ -17,24 +17,22 @@ use interfaces::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-  let icons = IconsObject::new();
-  let apps = AppsObject::new();
-  let tablet = TabletInterface::new();
-  let hyprland = HyprlandInterface::new();
-
   let conn = connection::Builder::session()?
     .name("org.hypr.Hyprmaster")?
-    .serve_at("/hyprland", hyprland)?
-    .serve_at("/tablet", tablet)?
-    .serve_at("/icons", icons)?
-    .serve_at("/apps", apps)?
+    .serve_at("/hyprland", HyprlandInterface::new())?
+    .serve_at("/tablet", TabletInterface::new())?
+    .serve_at("/icons", IconsObject::new())?
+    .serve_at("/apps", AppsObject::new())?
+    .max_queued(300)
     .build()
     .await?;
 
+  let (hsx, hrx) = HyprlandInterface::spawn_listener();
+
   _ = tokio::join!(
     AppsObject::listen(&conn),
-    //TabletInterface::listen()
-    HyprlandInterface::listen(&conn)
+    TabletInterface::listen(&conn, hsx.subscribe()),
+    HyprlandInterface::listen(&conn, hrx)
   );
 
   Ok(())

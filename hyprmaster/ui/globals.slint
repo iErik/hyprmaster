@@ -1,22 +1,91 @@
-export global UIColors {
-// #182026
-// #D9D9D9
-// #0D151A -> sidebar
-// #171D22 -> MenuBtn
-// #A3ABB6 20% -> MenuBtn hover
+export struct BackgroundColors {
+  base: brush,
+  overlay: brush,
 
-// #353F48 -> border
-
-  out property <brush> foreground: #A3ABB6;
-  out property <brush> text: #A3ABB6;
+  sidebar: brush,
+  widgets: brush,
+  window: brush,
+  boxes: brush,
+  hover: brush,
 }
 
+export struct ForegroundColors {
+  base: brush,
+  base-90: brush,
+  base-80: brush,
+  base-70: brush,
+  base-60: brush,
+  base-50: brush,
+  base-40: brush,
+  base-30: brush,
+  base-20: brush,
+  base-10: brush,
+
+  icon: brush,
+  text: brush,
+  placeholder: brush,
+}
+
+export struct UIFont {
+  family: string,
+  weight: int,
+  size: length
+}
+
+export global Theme {
+// #353F48 -> border
+
+  out property <BackgroundColors> bg: {
+    sidebar: rgba(13, 21, 26, 1.0),
+    widgets: rgba(35, 37, 41, 1.0),
+    window:  rgba(13, 14, 15, 1.0),
+    boxes:   rgba(20, 23, 27, 1.0),
+    hover:   rgba(163, 171, 182, 0.2)
+  };
+
+  out property <ForegroundColors> fg: {
+    base: rgba(163, 171, 182, 1.0),
+    base-90: rgba(163, 171, 182, 1.0),
+    base-80: rgba(163, 171, 182, 0.8),
+    base-70: rgba(163, 171, 182, 0.7),
+    base-60: rgba(163, 171, 182, 0.6),
+    base-50: rgba(163, 171, 182, 0.5),
+    base-40: rgba(163, 171, 182, 0.4),
+    base-30: rgba(163, 171, 182, 0.3),
+    base-20: rgba(163, 171, 182, 0.2),
+    base-10: rgba(163, 171, 182, 0.1),
+
+    icon: rgba(163, 171, 182, 1.0),
+    text: rgba(163, 171, 182, 1.0),
+    placeholder: rgba(163, 171, 182, 0.5)
+  };
+
+  out property <UIFont> font: {
+    family: "Ubuntu",
+    weight: 400,
+    size: 13px
+  };
+}
+
+
+export struct ColorSpec {
+  base:  brush,
+  light: brush,
+  dark:  brush
+}
+
+export global UITheme {
+  out property <length> border-radius: 8px;
+}
+
+
 export struct AppEntry {
-  name: string,
-  description: string,
-  wm_class: string,
-  icon: image,
-  fade: bool
+  name        :string,
+  description :string,
+  wm_class    :string,
+  icon        :image,
+  no_icon     :bool,
+  fade        :bool
 }
 
 export global UIState {

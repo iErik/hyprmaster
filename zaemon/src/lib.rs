@@ -12,4 +12,6 @@ pub mod icons {
   pub use super::interfaces::icons::*;
 }
 
-
+pub mod tablet {
+  pub use super::interfaces::tablet::*;
+}

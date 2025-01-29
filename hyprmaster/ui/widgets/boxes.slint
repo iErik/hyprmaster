@@ -1,4 +1,8 @@
-component Separator inherits Rectangle {
+// ----------------------*
+// -> Section components |
+// ----------------------*
+
+export component Separator inherits Rectangle {
   height: 1px;
 
   Rectangle {
@@ -27,7 +31,9 @@ export component SectionTitle inherits VerticalLayout {
 }
 
 export component SectionBox inherits Rectangle {
-  background: rgba(24, 32, 38, 0.4);
+  //background: rgba(24, 32, 38, 0.4);
+  //background: #2A2A2E;
+  background: #14171B;
   border-radius: 10px;
 
   in property <image> icon;
@@ -81,3 +87,53 @@ export component Section inherits Rectangle {
     @children
   }
 }
+
+
+
+// ------------------*
+// -> List component |
+// ------------------*
+
+export component List inherits Rectangle {
+  Flickable {
+    width: 100%;
+
+    VerticalLayout {
+      padding: 10px;
+      spacing: 5px;
+      alignment: start;
+
+      @children
+    }
+  }
+}
+
+export component ListItem inherits Rectangle {
+  border-radius: 8px;
+  width: 100%;
+  clip: true;
+
+  background: area.has_hover
+    ? rgba(46, 49, 50, 0.4)
+    : rgba(46, 49, 50, 0.0);
+
+  animate background {
+    duration: 500ms;
+    easing: ease-out-expo;
+  }
+
+  area := TouchArea {
+    mouse-cursor: MouseCursor.pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  HorizontalLayout {
+    alignment: start;
+    padding: 10px;
+
+    @children
+  }
+}
+
+
