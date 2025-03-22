@@ -24,23 +24,22 @@
   in {
     devShell.${system} = with pkgs; mkShell {
       nativeBuildInputs = [
-	openssl
-	rustPkg
+        openssl
+        rustPkg
       ];
 
       buildInputs = [
-	libxkbcommon
-	fontconfig
-	wayland
-	xwayland
+        libxkbcommon
+        fontconfig
+        wayland
+        xwayland
 
-	xorg.libX11
-	xorg.libXcursor
-	xorg.libXi
-	xorg.libXmu
-	xorg.libXrandr
+        xorg.libX11
+        xorg.libXcursor
+        xorg.libXi
+        xorg.libXmu
+        xorg.libXrandr
       ];
-
     };
   };
 }
