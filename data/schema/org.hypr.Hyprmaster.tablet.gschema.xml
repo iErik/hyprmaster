@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<schemalist>
+  <schema
+    id="org.hypr.Hyprmaster.tablet"
+    path="/org/hypr/Hyprmaster/tablet/"
+  >
+    <key name="bindings" type="a{ss}">
+      <default>[]</default>
+      <summary>Custom application bindings</summary>
+      <description>
+        List of custom application bindings, each key
+        represents a tablet preset name, and it's values
+        corresponds to the list of applications bound
+        to said preset.
+      </description>
+    </key>
+
+    <key name="presets" type="as">
+      <default>[]</default>
+      <summary>List of presets</summary>
+      <description>
+        Each value represents a given tablet preset
+      </description>
+    </key>
+  </schema>
+</schemalist>

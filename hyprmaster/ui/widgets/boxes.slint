@@ -1,0 +1,139 @@
+// ----------------------*
+// -> Section components |
+// ----------------------*
+
+export component Separator inherits Rectangle {
+  height: 1px;
+
+  Rectangle {
+    x: 5px;
+    height: 1px;
+    border-radius: 2px;
+
+    preferred-width: 100%;
+    width: parent.width - 10px;
+
+    //background: rgba(217, 217, 217, 0.06);
+    background: rgba(163, 171, 182, 0.22);
+  }
+}
+
+export component SectionTitle inherits VerticalLayout {
+  in property <string> text <=> textEl.text;
+  padding-top: 28px;
+  padding-bottom: 28px;
+
+  textEl := Text {
+    color: rgba(163, 171, 182, 1);
+    font-size: 16px;
+    font-weight: 600;
+  }
+}
+
+export component SectionBox inherits Rectangle {
+  //background: rgba(24, 32, 38, 0.4);
+  //background: #2A2A2E;
+  background: #14171B;
+  border-radius: 10px;
+
+  in property <image> icon;
+  in property <string> title;
+
+  VerticalLayout {
+    alignment: start;
+
+    HorizontalLayout {
+      alignment: start;
+      padding-top: 12px;
+      padding-bottom: 12px;
+      padding-left: 10px;
+      spacing: 7px;
+
+      VerticalLayout {
+        alignment: center;
+        padding-top: 2px;
+        Image {
+          width: 16px;
+          height: 16px;
+          source: icon;
+          colorize: rgba(163, 171, 182, 1);
+        }
+      }
+
+      Text {
+        text: title;
+        font-size: 15px;
+        font-weight: 400;
+        color: rgba(163, 171, 182, 1);
+      }
+    }
+
+    Separator {}
+
+    @children
+  }
+}
+
+export component Section inherits Rectangle {
+  in property <string> title;
+
+  VerticalLayout {
+    alignment: start;
+    padding-left: 15px;
+    padding-right: 15px;
+
+    SectionTitle { text: title; }
+
+    @children
+  }
+}
+
+
+
+// ------------------*
+// -> List component |
+// ------------------*
+
+export component List inherits Rectangle {
+  Flickable {
+    width: 100%;
+
+    VerticalLayout {
+      padding: 10px;
+      spacing: 5px;
+      alignment: start;
+
+      @children
+    }
+  }
+}
+
+export component ListItem inherits Rectangle {
+  border-radius: 8px;
+  width: 100%;
+  clip: true;
+
+  background: area.has_hover
+    ? rgba(46, 49, 50, 0.4)
+    : rgba(46, 49, 50, 0.0);
+
+  animate background {
+    duration: 500ms;
+    easing: ease-out-expo;
+  }
+
+  area := TouchArea {
+    mouse-cursor: MouseCursor.pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  HorizontalLayout {
+    alignment: start;
+    padding: 10px;
+
+    @children
+  }
+}
+
+
