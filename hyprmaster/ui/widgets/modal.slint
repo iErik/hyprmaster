@@ -1,0 +1,99 @@
+export component FadeModal inherits Rectangle {
+  background: rgba(13, 14, 15, 0.80);
+
+  width: 100%;
+  height: 100%;
+
+  x: 0px;
+  y: 0px;
+
+  VerticalLayout {
+    alignment: center;
+
+    HorizontalLayout {
+      alignment: center;
+
+      Rectangle {
+        background: rgba(24, 32, 38, 0.97);
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: rgba(53, 63, 72, 0.46);
+
+        width: 385px;
+        height: 455px;
+
+        @children
+      }
+    }
+  }
+}
+
+export component Overlay inherits Rectangle {
+  in property <bool> active: false;
+
+  width: 100%;
+  height: 100%;
+
+  x: 0px;
+  y: 0px;
+  z: 50;
+
+  tarea := TouchArea {
+    width: root.width + 100px;
+    height: 100%;
+
+    x: -100px;
+    y: 0px;
+
+    Rectangle {
+      background: rgba(13, 14, 15, 0.80);
+
+      VerticalLayout {
+        alignment: center;
+
+        HorizontalLayout {
+          alignment: center;
+
+          Rectangle {
+            background: rgba(24, 32, 38, 0.97);
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: rgba(53, 63, 72, 0.46);
+
+
+            width: 385px;
+            height: 455px;
+
+            @children
+          }
+        }
+      }
+    }
+  }
+
+  states [
+    visible when active: {
+      tarea.enabled: true;
+      tarea.visible: true;
+      tarea.opacity: 1.0;
+
+      in {
+        animate tarea.opacity {
+          duration: 250ms;
+          easing: ease-out-quint;
+        }
+      }
+    }
+
+    hidden when !active: {
+      tarea.enabled: false;
+      tarea.opacity: 0.0;
+
+      in {
+        animate tarea.opacity {
+          duration: 150ms;
+        }
+      }
+    }
+  ]
+}
