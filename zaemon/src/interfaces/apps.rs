@@ -4,9 +4,7 @@ use std::path::PathBuf;
 use std::error::Error;
 use std::boxed::Box;
 use std::sync::Arc;
-
-use serde_bytes::ByteBuf;
-//use serde_bytes::Bytes;
+use std::future::Future;
 
 use notify_debouncer_full::{
   notify::{
@@ -46,6 +44,7 @@ use zbus::{
   },
 };
 
+use serde_bytes::ByteBuf;
 use walkdir::WalkDir;
 use async_stream::stream;
 use futures_core::stream::Stream;
@@ -154,7 +153,7 @@ impl AppsObject {
 
   pub async fn trigger_cache_reset (
     conn: &zbus::Connection
-  ) -> Result<(), Box<dyn Error>>
+  ) -> Result<(), zbus::Error>
   {
     let member = MemberName::try_from("ResetCache")?;
     let msg = Message::method_call("/apps",
@@ -175,67 +174,71 @@ impl AppsObject {
 
     match res {
       DispatchResult::NotFound => {
-        Err(Box::<dyn Error>::from(ErrNotFound))
+        Err(zbus::Error::Failure(String::from(
+              "Couldn't reset App cache")))
       },
       DispatchResult::RequiresMut => {
-        Err(Box::<dyn Error>::from(ErrRequiresMut))
+        Err(zbus::Error::Failure(String::from(
+              "Couldn't reset App cache")))
       },
-      DispatchResult::Async(v) => {
-        v.await.map_err(|e| Box::new(e) as Box<dyn Error>)
-      }
+      DispatchResult::Async(v) => v.await.map_err(|_|
+        Err(zbus::Error::Failure(String::from(
+          "Couldn't reset App cache"))).unwrap())
     }
   }
 
-  pub async fn listen(conn: &zbus::Connection) ->
-    Result<(), Box<dyn Error>>
+  pub async fn listen(conn: zbus::Connection) ->
+    impl Future<Output = Result<(), Box<dyn Error>>> + 'static
   {
-    // Initial cache reset
-    Self::trigger_cache_reset(conn).await?;
+    async move {
+      // Initial cache reset
+      Self::trigger_cache_reset(&conn).await?;
 
-    let (sx, mut rx) = channel();
-    let sender = DebouncedSender(sx);
-    let timeframe = Duration::from_secs(1);
+      let (sx, mut rx) = channel();
+      let sender = DebouncedSender(sx);
+      let timeframe = Duration::from_secs(1);
 
-    let mut debouncer = new_debouncer(
-      timeframe, None, sender)?;
+      let mut debouncer = new_debouncer(
+        timeframe, None, sender)?;
 
-    app_lookup_dirs()
-      .iter()
-      .for_each(|p| {
-        if let Ok(_) = p.try_exists() {
-          let res = debouncer.watch(
-            &p,
-            RecursiveMode::NonRecursive
-          );
-
-          if res.is_err() {
-            _ = debouncer.unwatch(&p);
-          }
-        }
-      });
-
-    while let Some(db) = rx.recv().await {
-      let ev = db.event;
-
-      match ev.kind {
-          EvKind::Create(_) |
-          EvKind::Modify(_) |
-          EvKind::Remove(_) => {
-            println!("Event received: {:#?}", ev);
-            println!("Rebuilding cache: {:#?}", ev);
-
-            let res = Self::trigger_cache_reset(conn)
-              .await;
+      app_lookup_dirs()
+        .iter()
+        .for_each(|p| {
+          if let Ok(_) = p.try_exists() {
+            let res = debouncer.watch(
+              &p,
+              RecursiveMode::NonRecursive
+            );
 
             if res.is_err() {
-              println!("ResetCache error: {:#?}", res);
+              _ = debouncer.unwatch(&p);
             }
           }
-          _ => ()
-      }
-    }
+        });
 
-    Ok(())
+      while let Some(db) = rx.recv().await {
+        let ev = db.event;
+
+        match ev.kind {
+            EvKind::Create(_) |
+            EvKind::Modify(_) |
+            EvKind::Remove(_) => {
+              println!("Event received: {:#?}", ev);
+              println!("Rebuilding cache: {:#?}", ev);
+
+              let res = Self::trigger_cache_reset(&conn)
+                .await;
+
+              if res.is_err() {
+                println!("ResetCache error: {:#?}", res);
+              }
+            }
+            _ => ()
+        }
+      }
+
+      Ok(())
+    }
   }
 }
 
@@ -251,23 +254,27 @@ impl AppsObject {
     cache.clone()
   }
 
-
   async fn reset_cache(
     &mut self,
     #[zbus(signal_emitter)]
     sig_emitter: SignalEmitter<'_>,
     #[zbus(object_server)]
     srv: &ObjectServer
-  ) ->
-    zbus::fdo::Result<()>
+  )
+    -> zbus::fdo::Result<()>
   {
     let icns_intr = srv
       .interface::<_, IconsObject>("/icons").await?;
     let mut icns_intr = icns_intr.get_mut().await;
 
+    // TODO: This is causing the process to lag a bit during
+    // initialization, in turn causing hyprland events to
+    // be retained in the channel. Perhaps we could try
+    // something other than a stream
     let mut cache = self.cache.write().await;
     cache.clear();
 
+    /*
     let app_stream = get_apps_stream();
     pin_mut!(app_stream);
 
@@ -294,6 +301,37 @@ impl AppsObject {
         }
       };
     }
+    */
+
+    println!("Getting app list");
+    let app_stream = get_apps().await;
+    println!("App list fetched.");
+
+    for mut app in app_stream.into_iter() {
+      match app.icon_name.trim().is_empty() {
+        true => cache.push(app),
+        false => {
+          app.icon_path = icns_intr
+            .get_icon(app.icon_name.as_str()).await;
+
+          let img = Image::load_from_path(
+            PathBuf::from(&app.icon_path).as_path());
+
+          if img.is_err() || app.icon_path.is_empty() {
+            app.no_icon = true;
+          } else {
+            app.cached_icn = img.unwrap()
+              .to_rgba8_premultiplied()
+              .unwrap()
+              .into()
+          }
+
+          cache.push(app);
+        }
+      };
+    }
+
+    println!("App list processed");
 
     cache.sort();
     sig_emitter.app_list_changed().await?;
@@ -307,7 +345,6 @@ impl AppsObject {
     emitter: &SignalEmitter<'_>
   ) -> zbus::Result<()>;
 }
-
 
 
 

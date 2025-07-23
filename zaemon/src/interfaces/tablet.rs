@@ -21,6 +21,7 @@ use notify_debouncer_full::{
 
 use super::{HyprReceiver, HyprlandEvent};
 use crate::utils::notify::DebouncedSender;
+use crate::api::otd::OpenTabletDriver;
 use crate::dconf;
 
 
@@ -75,6 +76,10 @@ impl TabletInterface {
   }
 }
 
+/**
+ *
+ */
+
 impl TabletInterface {
   pub fn new() -> Self {
     Self {
@@ -84,7 +89,7 @@ impl TabletInterface {
   }
 
   async fn watch_gsettings(conn: &zbus::Connection) ->
-    Result<(), Box<dyn Error>>
+    Result<(), zbus::Error>
   {
     let mut cmd = Command::new("gsettings")
       .stdout(Stdio::piped())
@@ -100,12 +105,8 @@ impl TabletInterface {
     let iface = conn.object_server()
       .interface::<_, TabletInterface>("/tablet").await?;
 
-    tokio::spawn(async move {
-      let status = cmd.wait().await
-        .expect("gsettings process encountered an error");
-
-      eprintln!("Process exit status: {}", status);
-    });
+    _ = cmd.wait().await
+      .expect("gsettings process encountered an error");
 
     while let Some(line) = reader.next_line().await? {
       let line          = line.replace("bindings:", "");
@@ -130,7 +131,8 @@ impl TabletInterface {
 
   // TODO: BIG Debt
   async fn watch_presets(conn: &zbus::Connection)
-    -> Result<(), Box<dyn Error>>
+    //-> Result<(), Box<dyn Error + Send>>
+    -> Result<(), zbus::Error>
   {
     let p = get_presets_dir();
     let p = Path::new(&p);
@@ -138,7 +140,10 @@ impl TabletInterface {
     let (sx, mut rx) = channel();
     let sender = DebouncedSender(sx);
     let mut debouncer = new_debouncer(
-      Duration::from_secs(1), None, sender)?;
+      Duration::from_secs(1), None, sender)
+      .map_err(|_| zbus::Error::Failure(String::from(
+        "Failed to create notify debouncer instance"
+      )))?;
 
     match debouncer.watch(p, RecursiveMode::NonRecursive) {
       Err(e) => {
@@ -146,7 +151,8 @@ impl TabletInterface {
           "Failed to bind tablet presets watcher: {:#?}", e
         );
 
-        return Err(Box::<dyn Error>::from(e));
+        return Err(zbus::Error::Failure(String::from(
+          "Failed to bind tablet presets observer")))
       },
       _ => ()
     };
@@ -281,33 +287,31 @@ impl TabletInterface {
     conn: &zbus::Connection,
     mut hrx: HyprReceiver
   )
-    -> Result<(), Box<dyn Error>>
+    -> Result<(), zbus::Error>
   {
+    let otd = OpenTabletDriver::new();
+    let mut last_preset = String::from("");
     let iface = conn.object_server()
       .interface::<_, TabletInterface>("/tablet")
       .await?;
-
-    let mut last_preset = String::from("");
+    println!("boom");
 
     while let Ok(ev) = hrx.recv().await {
+
       match ev {
         HyprlandEvent::ActiveWindow {
-          window_class: class,
+          window_class: wclass,
           ..
         } => {
-          let class = class.to_lowercase();
-          let bindings = iface.get().await.bindings
-            .clone();
-          if !bindings.contains_key(&class) { continue; }
+          let wclass = wclass.to_lowercase();
+          let bindings = iface.get().await.bindings.clone();
 
-          if bindings[&class] == last_preset { continue }
+          if !bindings.contains_key(&wclass) { continue; }
+          if bindings[&wclass] == last_preset { continue }
 
-          match apply_preset(&bindings[&class]) {
+          match otd.apply_preset(&bindings[&wclass]) {
             Ok(_) => {
-              last_preset = bindings[&class].clone();
-
-              println!("Changed preset to: {:#?}",
-                last_preset);
+              last_preset = bindings[&wclass].clone();
             },
             Err(e) => eprintln!(
               "Failed to apply tablet preset: {:#?}", e)
@@ -317,20 +321,55 @@ impl TabletInterface {
       };
     }
 
+    /*
+    loop {
+      let ev = hrx.recv().await;
+
+      match ev {
+        Ok(HyprlandEvent::ActiveWindow {
+          window_class: wclass,
+          ..
+        }) => {
+          let wclass = wclass.to_lowercase();
+          let bindings = iface.get().await.bindings.clone();
+
+          if !bindings.contains_key(&wclass) { continue; }
+          if bindings[&wclass] == last_preset { continue }
+
+          match otd.apply_preset(&bindings[&wclass]) {
+            Ok(_) => {
+              last_preset = bindings[&wclass].clone();
+            },
+            Err(e) => eprintln!(
+              "Failed to apply tablet preset: {:#?}", e)
+          };
+        },
+        Err(e) => {
+          println!("Hyprland socket error: {:#?}", e);
+          break;
+        }
+        _  => continue,
+      };
+    }
+    */
+
+
+    println!("dropped");
+
     Ok(())
   }
 
   pub async fn listen(
-    conn: &zbus::Connection,
+    conn: zbus::Connection,
     hrx: HyprReceiver
-  ) -> Result<(), Box<dyn Error>> {
+  ) {
     _ = tokio::join!(
-      Self::watch_gsettings(conn),
-      Self::watch_presets(conn),
-      Self::watch_hyprsock(conn, hrx)
+      Self::watch_gsettings(&conn),
+      Self::watch_presets(&conn),
+      Self::watch_hyprsock(&conn, hrx)
     );
 
-    Ok(())
+    //Ok(())
   }
 }
 
@@ -426,10 +465,11 @@ async fn set_bindings(to: &TabletBindings) ->
   }
 }
 
-/* -
+/*
+ * -
  * -> OpenTabletDriver Integration
  * -
-*/
+ */
 
 fn apply_preset(preset_name: &str) ->
   Result<(),Box<dyn Error>>

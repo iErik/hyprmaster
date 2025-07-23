@@ -3,6 +3,8 @@ use std::error::Error as STDErr;
 use std::collections::HashMap;
 use std::env::var;
 
+use std::future::Future;
+
 use tokio::{
   sync::broadcast::{self, Sender, Receiver},
   net::UnixStream
@@ -13,7 +15,6 @@ use zbus::{
   zvariant::Type,
   object_server::SignalEmitter as Emitter
 };
-
 
 
 pub(crate) type HyprSender = Sender<HyprlandEvent>;
@@ -285,165 +286,167 @@ impl HyprlandInterface {
   }
 
   pub async fn listen(
-    conn: &zbus::Connection,
+    conn: zbus::Connection,
     mut receiver: HyprReceiver
   ) ->
-    Result<(), Box<dyn STDErr>>
+    impl Future<Output = Result<(), Box<zbus::Error>>> + 'static
   {
-    let emit = conn.object_server()
-      .interface::<_, HyprlandInterface>("/hyprland")
-      .await?;
+    async move {
+      let emit = conn.object_server()
+        .interface::<_, HyprlandInterface>("/hyprland")
+        .await?;
 
-    while let Ok(ev) = receiver.recv().await {
-      let res = match ev {
-        HyprlandEvent::WorkspaceChanged {
-          workspace_name,
-          workspace_id
-        } => emit.workspace(workspace_name, workspace_id),
+      while let Ok(ev) = receiver.recv().await {
+        let res = match ev {
+          HyprlandEvent::WorkspaceChanged {
+            workspace_name,
+            workspace_id
+          } => emit.workspace(workspace_name, workspace_id),
 
-        HyprlandEvent::FocusedMonitor {
-          monitor_name: m_name,
-          workspace_name: w_name,
-          workspace_id: w_id
-        } => emit.focused_monitor(m_name, w_name, w_id),
+          HyprlandEvent::FocusedMonitor {
+            monitor_name: m_name,
+            workspace_name: w_name,
+            workspace_id: w_id
+          } => emit.focused_monitor(m_name, w_name, w_id),
 
-        HyprlandEvent::ActiveWindow {
-          window_class: class,
-          window_title: title,
-          window_address: addr
-        } => emit.active_window(class, title, addr),
+          HyprlandEvent::ActiveWindow {
+            window_class: class,
+            window_title: title,
+            window_address: addr
+          } => emit.active_window(class, title, addr),
 
-        HyprlandEvent::Fullscreen {
-          is_fullscreen
-        } => emit.fullscreen(is_fullscreen),
+          HyprlandEvent::Fullscreen {
+            is_fullscreen
+          } => emit.fullscreen(is_fullscreen),
 
-        HyprlandEvent::MonitorRemoved {
-          monitor_name: m_name
-        } => emit.monitor_removed(m_name),
+          HyprlandEvent::MonitorRemoved {
+            monitor_name: m_name
+          } => emit.monitor_removed(m_name),
 
-        HyprlandEvent::MonitorAdded {
-          monitor_name: name,
-          monitor_id: id,
-          monitor_description: desc
-        } => emit.monitor_added(id, name, desc),
+          HyprlandEvent::MonitorAdded {
+            monitor_name: name,
+            monitor_id: id,
+            monitor_description: desc
+          } => emit.monitor_added(id, name, desc),
 
-        HyprlandEvent::CreateWorkspace {
-          workspace_name: name,
-          workspace_id: id
-        } => emit.create_workspace(name, id),
+          HyprlandEvent::CreateWorkspace {
+            workspace_name: name,
+            workspace_id: id
+          } => emit.create_workspace(name, id),
 
-        HyprlandEvent::DestroyWorkspace {
-          workspace_name: name,
-          workspace_id: id
-        } => emit.destroy_workspace(id, name),
+          HyprlandEvent::DestroyWorkspace {
+            workspace_name: name,
+            workspace_id: id
+          } => emit.destroy_workspace(id, name),
 
-        HyprlandEvent::MoveWorkspace {
-          workspace_name: name,
-          workspace_id: id,
-          monitor_name: m_name
-        } => emit.move_workspace(id, name, m_name),
+          HyprlandEvent::MoveWorkspace {
+            workspace_name: name,
+            workspace_id: id,
+            monitor_name: m_name
+          } => emit.move_workspace(id, name, m_name),
 
-        HyprlandEvent::RenameWorkspace {
-          workspace_id: id,
-          new_name: name
-        } => emit.rename_workspace(id, name),
+          HyprlandEvent::RenameWorkspace {
+            workspace_id: id,
+            new_name: name
+          } => emit.rename_workspace(id, name),
 
-        HyprlandEvent::ActiveSpecial {
-          workspace_name: w_name,
-          monitor_name: m_name
-        } => emit.active_special(w_name, m_name),
+          HyprlandEvent::ActiveSpecial {
+            workspace_name: w_name,
+            monitor_name: m_name
+          } => emit.active_special(w_name, m_name),
 
-        HyprlandEvent::ActiveLayout {
-          keyboard_name: k_name,
-          layout_name: l_name
-        } => emit.active_layout(k_name, l_name),
+          HyprlandEvent::ActiveLayout {
+            keyboard_name: k_name,
+            layout_name: l_name
+          } => emit.active_layout(k_name, l_name),
 
-        HyprlandEvent::OpenWindow {
-          window_address: addr,
-          workspace_name: w_name,
-          window_class: class,
-          window_title: title
-        } => emit.open_window(addr, w_name, class, title),
+          HyprlandEvent::OpenWindow {
+            window_address: addr,
+            workspace_name: w_name,
+            window_class: class,
+            window_title: title
+          } => emit.open_window(addr, w_name, class, title),
 
-        HyprlandEvent::CloseWindow {
-          window_address
-        } => emit.close_window(window_address),
+          HyprlandEvent::CloseWindow {
+            window_address
+          } => emit.close_window(window_address),
 
-        HyprlandEvent::MoveWindow {
-          window_address: addr,
-          workspace_name: w_name,
-          workspace_id: w_id
-        } => emit.move_window(addr, w_id, w_name),
+          HyprlandEvent::MoveWindow {
+            window_address: addr,
+            workspace_name: w_name,
+            workspace_id: w_id
+          } => emit.move_window(addr, w_id, w_name),
 
-        HyprlandEvent::OpenLayer {
-          namespace
-        } => emit.open_layer(namespace),
+          HyprlandEvent::OpenLayer {
+            namespace
+          } => emit.open_layer(namespace),
 
-        HyprlandEvent::CloseLayer {
-          namespace
-        } => emit.close_layer(namespace),
+          HyprlandEvent::CloseLayer {
+            namespace
+          } => emit.close_layer(namespace),
 
-        HyprlandEvent::Submap {
-          submap_name
-        } => emit.submap(submap_name),
+          HyprlandEvent::Submap {
+            submap_name
+          } => emit.submap(submap_name),
 
-        HyprlandEvent::ChangeFloatingMode {
-          window_address: addr,
-          floating: status
-        } => emit.change_floating_mode(addr, status),
+          HyprlandEvent::ChangeFloatingMode {
+            window_address: addr,
+            floating: status
+          } => emit.change_floating_mode(addr, status),
 
-        HyprlandEvent::Urgent {
-          window_address
-        } => emit.urgent(window_address),
+          HyprlandEvent::Urgent {
+            window_address
+          } => emit.urgent(window_address),
 
-        HyprlandEvent::Screencast {
-          active,
-          owner
-        } => emit.screencast(active, owner),
+          HyprlandEvent::Screencast {
+            active,
+            owner
+          } => emit.screencast(active, owner),
 
-        HyprlandEvent::WindowTitle {
-          window_address: addr,
-          window_title: title
-        } => emit.window_title(addr, title),
+          HyprlandEvent::WindowTitle {
+            window_address: addr,
+            window_title: title
+          } => emit.window_title(addr, title),
 
-        HyprlandEvent::ToggleGroup {
-          destroyed,
-          window_addresses: addrs,
-        } => emit.toggle_group(destroyed, addrs),
+          HyprlandEvent::ToggleGroup {
+            destroyed,
+            window_addresses: addrs,
+          } => emit.toggle_group(destroyed, addrs),
 
-        HyprlandEvent::MoveIntoGroup {
-          window_address: addr
-        } => emit.move_into_group(addr),
+          HyprlandEvent::MoveIntoGroup {
+            window_address: addr
+          } => emit.move_into_group(addr),
 
-        HyprlandEvent::MoveOutOfGroup {
-          window_address: addr
-        } => emit.move_outof_group(addr),
+          HyprlandEvent::MoveOutOfGroup {
+            window_address: addr
+          } => emit.move_outof_group(addr),
 
-        HyprlandEvent::IgnoreGroupLock {
-          state
-        } => emit.ignore_group_lock(state),
+          HyprlandEvent::IgnoreGroupLock {
+            state
+          } => emit.ignore_group_lock(state),
 
-        HyprlandEvent::LockGroups {
-          state
-        } => emit.lock_groups(state),
+          HyprlandEvent::LockGroups {
+            state
+          } => emit.lock_groups(state),
 
-        HyprlandEvent::ConfigReloaded =>
-          emit.config_reloaded(),
+          HyprlandEvent::ConfigReloaded =>
+            emit.config_reloaded(),
 
-        HyprlandEvent::Pin {
-          window_address: addr,
-          pinned
-        } => emit.pin(addr, pinned)
-      };
+          HyprlandEvent::Pin {
+            window_address: addr,
+            pinned
+          } => emit.pin(addr, pinned)
+        };
 
-      match res.await {
-        Err(e) => println!(
-          "Failed to emit hyprland signal: {:#?}", e),
-        _ => ()
-      };
+        match res.await {
+          Err(e) => println!(
+            "Failed to emit hyprland signal: {:#?}", e),
+          _ => ()
+        };
+      }
+
+      Ok(())
     }
-
-    Ok(())
   }
 
   pub async fn old_listen(
